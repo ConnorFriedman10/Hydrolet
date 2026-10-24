@@ -28,27 +28,49 @@ int parseMinutes(const char* hhmm) {
   return h * 60 + atoi(colon + 1);
 }
 
+// One TLS connection, kept open between requests. Every request blocks the
+// main loop (scale, ring, watch), and a fresh TLS handshake costs the C3
+// 1-3 s on its own. That used to happen on every 5 s check-in and every sip.
+// With keep-alive, only the first request (or the first after a drop) pays
+// for the handshake; the rest take a few hundred ms.
+WiFiClientSecure tls;
+HTTPClient http;
+bool httpReady = false;
+
 /** Returns the HTTP status, or a negative number on a transport failure. */
 int post(const char* path, const String& body, String* responseOut) {
   if (WiFi.status() != WL_CONNECTED) return -1;
 
-  WiFiClientSecure client;
-  // Good enough for the event. For anything real, pin Supabase's root cert.
-  client.setInsecure();
+  if (!httpReady) {
+    // Good enough for the event. For anything real, pin Supabase's root cert.
+    tls.setInsecure();
+    http.setReuse(true);
+    http.setTimeout(HTTP_TIMEOUT_MS);
+    http.setConnectTimeout(HTTP_TIMEOUT_MS);
+    httpReady = true;
+  }
 
-  HTTPClient http;
-  http.setTimeout(HTTP_TIMEOUT_MS);
-
+  const unsigned long started = millis();
   String url = String(API_BASE_URL) + path;
-  if (!http.begin(client, url)) return -2;
+  if (!http.begin(tls, url)) return -2;
 
   http.addHeader("Content-Type", "application/json");
   http.addHeader("X-Device-Id", DEVICE_ID);
   http.addHeader("X-Device-Secret", DEVICE_SECRET);
 
   const int status = http.POST(body);
-  if (responseOut && status > 0) *responseOut = http.getString();
-  http.end();
+  // Read the whole reply either way: the connection can only be reused once
+  // nothing is left unread on it.
+  String reply = status > 0 ? http.getString() : String();
+  if (responseOut) *responseOut = reply;
+  http.end();   // with reuse on, this keeps the connection open
+
+  // A failed request may leave the connection half-open. Drop it, so the next
+  // request starts clean instead of failing on the same dead socket.
+  if (status <= 0) tls.stop();
+
+  const unsigned long took = millis() - started;
+  if (took > 800) Serial.printf("[API] %s took %lu ms (status %d)\n", path, took, status);
   return status;
 }
 
