@@ -126,6 +126,11 @@ export default function Dashboard() {
                 <span className="muted small">
                   {e.target === null ? `${e.drank} mL` : `${e.drank} of ${e.target} mL`}
                 </span>
+                {e.target !== null && e.drank > 0 && (
+                  <span className="bar thin">
+                    <span style={{ width: `${Math.min(100, Math.round((e.drank / e.target) * 100))}%` }} />
+                  </span>
+                )}
               </span>
             </li>
           ))}
@@ -135,7 +140,11 @@ export default function Dashboard() {
       <section className="card">
         <h2>Devices</h2>
         {(['coaster', 'watch'] as const).map((type) => {
-          const d = devices.find((x) => x.type === type)
+          // If a device was re-registered, the old row lingers; show the one
+          // that has checked in most recently.
+          const d = devices
+            .filter((x) => x.type === type)
+            .sort((a, b) => (b.last_seen ?? '').localeCompare(a.last_seen ?? ''))[0]
           const online = d?.last_seen && Date.now() - new Date(d.last_seen).getTime() < ONLINE_WINDOW_MS
           return (
             <p key={type}>

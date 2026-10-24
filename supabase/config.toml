@@ -1,0 +1,13 @@
+# Only the settings this project relies on. Everything else uses the CLI defaults.
+
+project_id = "Hydrolet"
+
+# Both functions authenticate every request themselves, so the gateway's JWT
+# check stays off. Keeping it here means a plain `supabase functions deploy`
+# can't silently turn it back on and lock out the coaster or pg_cron.
+
+[functions.device-api]
+verify_jwt = false
+
+[functions.send-push]
+verify_jwt = false

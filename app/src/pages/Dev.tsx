@@ -3,6 +3,7 @@ import { useSubject } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 import type { HydroEvent, ReminderSlot } from '../lib/types'
 import { formatTime, hasDay, startOfToday, todayIndex, toMinutes } from '../lib/schedule'
+import { sendPush } from '../lib/push'
 
 // Hidden page at /dev, not linked from the nav. Fakes what the coaster will
 // send, so the dashboard and timeline can be built and demoed without hardware.
@@ -114,6 +115,28 @@ export default function Dev() {
             </div>
           </>
         )}
+      </section>
+
+      <section className="card">
+        <h2>Push notifications</h2>
+        <p className="muted small">
+          Sends to this account and everyone caring for it, on every device with
+          notifications on. Turn them on from the Family page.
+        </p>
+        <div className="row">
+          {(['summary', 'behind'] as const).map((kind) => (
+            <button key={kind} className="secondary" onClick={async () => {
+              try {
+                const r = await sendPush({ kind, main_id: subject.id })
+                setOut(`${kind}: sent ${r.sent}, removed ${r.removed}, failed ${r.failed}`)
+              } catch (err) {
+                setOut(`${kind}: ${err instanceof Error ? err.message : String(err)}`)
+              }
+            }}>
+              {kind === 'summary' ? "Send today's summary now" : 'Send a behind alert'}
+            </button>
+          ))}
+        </div>
       </section>
 
       <section className="card">

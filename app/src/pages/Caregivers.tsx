@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useSubject } from '../lib/auth'
 import { supabase } from '../lib/supabase'
+import NotificationsCard from '../components/NotificationsCard'
 
 export default function Caregivers() {
   // caregivers comes from the same profiles call the switcher uses, so this
@@ -71,6 +72,8 @@ export default function Caregivers() {
         </label>
         <button onClick={redeem} disabled={busy || code.length < 8}>Add</button>
       </section>
+
+      <NotificationsCard />
 
       <section className="card">
         <h2>People you care for</h2>

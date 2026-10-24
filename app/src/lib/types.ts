@@ -27,6 +27,16 @@ export type ReminderSlot = {
   time_of_day: string   // "09:00:00"
   days_mask: number
   amount_ml: number
+  created_at?: string
+}
+
+export type Summary = {
+  main_id: string
+  date: string          // "YYYY-MM-DD", the account's local date
+  total_ml: number
+  goal_ml: number
+  reminders_sent: number
+  reminders_ignored: number
 }
 
 export type Device = {

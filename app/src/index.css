@@ -109,7 +109,11 @@ button.link {
 
 /* Progress bar */
 .bar { height: 12px; background: var(--line); border-radius: 6px; overflow: hidden; }
-.bar > div { height: 100%; background: var(--blue); transition: width 0.4s; }
+.bar > div, .bar > span { display: block; height: 100%; background: var(--blue); transition: width 0.4s; }
+
+/* The same bar on a single reminder in the timeline. */
+.bar.thin { display: block; height: 5px; margin-top: 6px; max-width: 180px; }
+.tl.completed .bar.thin > span { background: var(--green); }
 
 /* Day strip: where the reminders fall across the day.
    Decorative and non-interactive; the list beneath carries the values.
@@ -154,6 +158,14 @@ button.link {
 .tl.upcoming { opacity: 0.65; }
 .tl.completed .tl-status { color: var(--green); }
 .tl.ignored .tl-status, .tl.not-logged .tl-status { color: var(--red); }
+
+/* Summary page: day switcher and the sips under each reminder */
+.daynav { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.daynav h2 { margin: 0; text-align: center; flex: 1; }
+.daynav button { min-width: 48px; padding: 0; font-size: 1.4rem; }
+.center-text { text-align: center; }
+.sips { list-style: none; margin: 4px 0 0; padding: 0; color: var(--muted); }
+.sips li { margin: 0; }
 
 /* Device status dot */
 .dot {

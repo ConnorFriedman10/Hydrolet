@@ -80,12 +80,37 @@ export function nowMinutes(timeZone: string, now = new Date()): number {
 
 /** The instant at which "today" began in the given timezone. */
 export function startOfToday(timeZone: string, now = new Date()): Date {
+  return startOfDate(timeZone, localDate(timeZone, now))
+}
+
+/** Today's date in the given timezone, as "YYYY-MM-DD". */
+export function localDate(timeZone: string, now = new Date()): string {
   const { year, month, day } = partsIn(timeZone, now)
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+/** "2026-10-24" plus n days, as a date string. Calendar maths only; no timezone involved. */
+export function addDays(ymd: string, n: number): string {
+  const [y, m, d] = ymd.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10)
+}
+
+/** The instant at which the given local date ("YYYY-MM-DD") began in the given timezone. */
+export function startOfDate(timeZone: string, ymd: string): Date {
+  const [year, month, day] = ymd.split('-').map(Number)
   const guess = Date.UTC(year, month - 1, day, 0, 0, 0)
   // How far that timezone is from UTC at that moment.
   const probe = partsIn(timeZone, new Date(guess))
   const asUtc = Date.UTC(probe.year, probe.month - 1, probe.day, probe.hour, probe.minute, probe.second)
   return new Date(guess - (asUtc - guess))
+}
+
+/** "2026-10-24" -> "Saturday, October 24". */
+export function formatDate(ymd: string): string {
+  const [y, m, d] = ymd.split('-').map(Number)
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'UTC', weekday: 'long', month: 'long', day: 'numeric',
+  }).format(new Date(Date.UTC(y, m - 1, d)))
 }
 
 /** An event's wall-clock time in the given timezone, as "9:05 AM". */

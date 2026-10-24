@@ -36,6 +36,7 @@ Each check-in updates `last_seen` for the coaster (and the watch, if connected).
 
 ```json
 {
+  "now": "13:45",
   "today_reminders": [
     { "id": "uuid", "time": "09:00", "amount_ml": 150 },
     { "id": "uuid", "time": "13:30", "amount_ml": 200 }
@@ -44,6 +45,8 @@ Each check-in updates `last_seen` for the coaster (and the watch, if connected).
   "pending_command": null
 }
 ```
+
+`now` is the account's own local time, same clock as the reminder times. The coaster compares the two strings and needs no real-time clock, no NTP and no timezone handling of its own; it also cannot drift. A `now` earlier than the previous check-in means the day rolled over, which is how the coaster knows to clear which reminders it has already fired.
 
 Events for one firing:
 

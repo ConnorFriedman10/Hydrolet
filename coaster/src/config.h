@@ -1,0 +1,70 @@
+// Everything tunable in one place, so nothing has to be hunted for in the
+// middle of the event.
+#pragma once
+
+// --- Pins (XIAO ESP32-C3 silkscreen labels, see the wiring diagram) --------
+#define PIN_HX711_DT   D3
+#define PIN_HX711_SCK  D4
+#define PIN_LED_DATA   D2
+
+// --- LED ring --------------------------------------------------------------
+#define LED_COUNT      18
+
+// Full white on 18 WS2812Bs is about 1.1 A, which would brown out a 1 A
+// supply with the ESP32-C3 also drawing from it. The ring never shows white —
+// green through red uses at most two channels — but this cap keeps the worst
+// case near 250 mA. Raise it only after testing with the real adapter.
+#define LED_BRIGHTNESS 90   // of 255
+
+// --- Load cell -------------------------------------------------------------
+// Counts per gram. Find it by putting a known weight on the coaster and
+// running the `cal` serial command; see README.
+#define SCALE_CALIBRATION 420.0f
+
+// Load cells are noisy, so a reading only counts once it has held still.
+// Measured on the built coaster after calibration: single readings scatter
+// with a standard deviation of about 5 g (four 50 kg cells give only ~14
+// counts per gram). So stillness is judged on the scatter of a window, and
+// the weight is that window's average, which is good to about ±1.5 g.
+#define SETTLE_SAMPLES   16     // window of readings judged together
+#define SETTLE_MAX_SD    8.0f   // grams; above this the cup is moving
+#define SETTLE_TOLERANCE 4.0f   // grams; a smaller shift in the average is the same weight
+#define MIN_SIP_G        8.0f   // smaller changes are noise, not a sip
+// Load cells creep for a second or two after a cup is set down (measured: a
+// reading 8 g low that climbed to its true value). A new weight only counts
+// once it has stayed within SETTLE_TOLERANCE for this long.
+#define SETTLE_HOLD_MS   2000UL
+#define CUP_PRESENT_G    20.0f  // below this, nothing is on the coaster
+
+// 1 mL of water weighs 1 g. Kept named so the intent is obvious at the call site.
+#define ML_PER_GRAM 1.0f
+
+// --- Reminder cycle --------------------------------------------------------
+// An on-demand "remind her now" has no scheduled amount behind it, so it
+// needs a stand-in target to measure against.
+#define REMIND_NOW_ML       150
+
+#define BUZZ_COUNT          3
+#define BUZZ_INTERVAL_MS    60000UL   // one minute apart
+#define IGNORED_TIMEOUT_MS  120000UL  // after the last buzz, with no sip at all
+// A reminder found more than this late (coaster was off, or offline) is
+// skipped rather than fired, so a boot at 2pm does not replay the morning.
+#define MISSED_GRACE_MIN    30
+
+// --- Watch (BLE) -----------------------------------------------------------
+// A scan blocks the loop for its full duration, so it is kept short and
+// infrequent. Nothing needs it to be fast: the watch is found within a few
+// seconds of coming into range either way.
+#define SCAN_DURATION_MS 800UL
+#define SCAN_INTERVAL_MS 10000UL
+
+// --- Cloud -----------------------------------------------------------------
+#define CHECKIN_INTERVAL_MS 5000UL
+// Also blocking, so keep it well under the check-in interval.
+#define HTTP_TIMEOUT_MS     4000UL
+#define QUEUE_CAPACITY      24        // events held through a Wi-Fi drop
+
+// --- Time-lapse ------------------------------------------------------------
+// Demo mode: the reminder cycle runs this many times faster, so a whole day
+// fits in a couple of minutes on stage. Sip detection is unaffected.
+#define TIMELAPSE_FACTOR 30

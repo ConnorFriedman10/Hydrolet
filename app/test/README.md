@@ -25,6 +25,11 @@ ignored, or never sent. Also covers slots on other weekdays being excluded,
 unscheduled "remind her now" firings, sips not leaking between firings, and
 ordering. Node runs the TypeScript source directly via `--experimental-strip-types`.
 
+**`send-push.test.mjs`** — pure logic, no network. Request parsing, the
+conversion of base64url VAPID keys to the JWKs the Deno webpush library needs
+(round-tripped through WebCrypto), a check that `VITE_VAPID_PUBLIC_KEY` in
+`app/.env` is a valid key, and the notification text.
+
 **`caregiver.test.mjs`** — redeeming a caregiver code, what that grants, and
 removing it again.
 

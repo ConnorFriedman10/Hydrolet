@@ -4,7 +4,8 @@
 // Node runs the TypeScript source directly via --experimental-strip-types
 // (see the npm scripts).
 
-import { buildTimeline, scheduledTotal } from '../src/lib/timeline.ts'
+import { buildDay, buildTimeline, scheduledTotal } from '../src/lib/timeline.ts'
+import { addDays, formatDate, localDate, startOfDate } from '../src/lib/schedule.ts'
 import { createSuite, runIfMain } from './helpers.mjs'
 
 const TZ = 'America/New_York'
@@ -155,6 +156,49 @@ export async function run() {
   }
   {
     check('no reminders means no target', scheduledTotal(buildTimeline([], [], TZ, NOW)) === 0)
+  }
+
+  // --- date helpers (Summary page) ----------------------------------------
+  check('localDate follows the account zone, not UTC',
+    localDate(TZ, new Date('2026-10-28T03:30:00Z')) === '2026-10-27')
+  check('addDays crosses month ends', addDays('2026-10-31', 1) === '2026-11-01'
+    && addDays('2026-03-01', -1) === '2026-02-28')
+  check('startOfDate is local midnight (EDT)',
+    startOfDate(TZ, '2026-10-28').toISOString() === '2026-10-28T04:00:00.000Z')
+  check('startOfDate after the DST change (EST)',
+    startOfDate(TZ, '2026-11-02').toISOString() === '2026-11-02T05:00:00.000Z')
+  check('formatDate', formatDate('2026-10-24') === 'Saturday, October 24', formatDate('2026-10-24'))
+
+  // --- buildDay -----------------------------------------------------------
+  // Viewing Tuesday 2026-10-27 from Wednesday NOW: a finished day.
+  {
+    const s = slot('09:00', 200)
+    const late = slot('18:00', 100)
+    const ev = [
+      { ...event('reminder', { reminderId: 'y1', slotId: s.id }), created_at: '2026-10-27T13:00:00Z' },
+      { ...event('sip', { reminderId: 'y1', ml: 150 }), created_at: '2026-10-27T13:03:00Z' },
+      { ...event('completed', { reminderId: 'y1' }), created_at: '2026-10-27T13:04:00Z' },
+      // Wednesday's events must not leak into Tuesday.
+      { ...event('sip', { reminderId: 'w1', ml: 999 }), created_at: '2026-10-28T13:00:00Z' },
+    ]
+    const d = buildDay(ev, [s, late], TZ, '2026-10-27', NOW)
+    check('buildDay: only that day\'s events', d.total === 150 && d.events.length === 3, String(d.total))
+    check('buildDay: a past slot that never fired is not-logged, not upcoming',
+      d.entries.find((e) => e.key === late.id)?.status === 'not-logged')
+    check('buildDay: completed reminder carries its firing id',
+      d.entries.find((e) => e.key === s.id)?.reminderId === 'y1')
+    check('buildDay: counts', d.sent === 1 && d.ignored === 0 && d.planned === 300)
+  }
+  {
+    // A slot created after a past day ended wasn't part of that day.
+    const s = { ...slot('09:00', 200), created_at: '2026-10-28T12:00:00Z' }
+    const d = buildDay([], [s], TZ, '2026-10-27', NOW)
+    check('buildDay: slots created later are left out of past days', d.entries.length === 0)
+  }
+  {
+    // Today is read as of now: 3 PM is still upcoming at noon.
+    const d = buildDay([], [slot('15:00')], TZ, '2026-10-28', NOW)
+    check('buildDay: today keeps upcoming reminders', d.entries[0]?.status === 'upcoming')
   }
 
   return results()

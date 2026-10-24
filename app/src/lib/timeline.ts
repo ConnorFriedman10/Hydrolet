@@ -6,6 +6,7 @@
 import type { HydroEvent, ReminderSlot } from './types.ts'
 import {
   formatTime, toMinutes, hasDay, todayIndex, nowMinutes, eventTime, eventMinutes,
+  addDays, startOfDate,
 } from './schedule.ts'
 
 export type Status = 'upcoming' | 'active' | 'completed' | 'ignored' | 'not-logged'
@@ -18,6 +19,7 @@ export type Entry = {
   drank: number
   status: Status
   scheduled: boolean
+  reminderId: string | null  // the firing's id, null if it never fired; finds its sips
 }
 
 export const STATUS_TEXT: Record<Status, string> = {
@@ -89,6 +91,7 @@ export function buildTimeline(
       drank: firing ? drankIn(firing.reminder_id) : 0,
       status,
       scheduled: true,
+      reminderId: firing?.reminder_id ?? null,
     })
   }
 
@@ -104,8 +107,54 @@ export function buildTimeline(
       drank: drankIn(firing.reminder_id),
       status: closer ? (closer.type === 'completed' ? 'completed' : 'ignored') : 'active',
       scheduled: false,
+      reminderId: firing.reminder_id,
     })
   }
 
   return entries.sort((a, b) => a.minutes - b.minutes)
+}
+
+export type Day = {
+  entries: Entry[]
+  events: HydroEvent[]  // only the ones inside the day
+  total: number         // every sip that day, scheduled or not
+  planned: number       // what the day's scheduled reminders add up to
+  sent: number          // reminders that went off
+  ignored: number
+}
+
+/**
+ * One local day ("YYYY-MM-DD"), for the Summary page. Today is shown as it
+ * stands right now; a finished day is read as of its last minute, so nothing in
+ * it is "upcoming".
+ *
+ * The schedule is today's. For a past day, slots created after that day are
+ * left out, but a slot edited since then shows its current time and amount.
+ */
+export function buildDay(
+  events: HydroEvent[],
+  slots: ReminderSlot[],
+  tz: string,
+  ymd: string,
+  now = new Date(),
+): Day {
+  const start = startOfDate(tz, ymd).getTime()
+  const end = startOfDate(tz, addDays(ymd, 1)).getTime()
+
+  const inDay = events.filter((e) => {
+    const t = Date.parse(e.created_at)
+    return t >= start && t < end
+  })
+  const existed = slots.filter((s) => !s.created_at || Date.parse(s.created_at) < end)
+  const asOf = now.getTime() >= end ? new Date(end - 60_000) : now
+
+  const entries = buildTimeline(inDay, existed, tz, asOf)
+  return {
+    entries,
+    events: inDay,
+    total: inDay.filter((e) => e.type === 'sip').reduce((sum, e) => sum + (e.amount_ml ?? 0), 0),
+    planned: scheduledTotal(entries),
+    sent: inDay.filter((e) => e.type === 'reminder').length,
+    ignored: inDay.filter((e) => e.type === 'ignored').length,
+  }
 }
