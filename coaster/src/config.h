@@ -42,7 +42,10 @@
 // reading 8 g low that climbed to its true value). A new weight only counts
 // once it has stayed within SETTLE_TOLERANCE for this long.
 #define SETTLE_HOLD_MS   2000UL
-#define CUP_PRESENT_G    20.0f  // below this, nothing is on the coaster
+// Below this, nothing is on the coaster; at or above it, that is the cup.
+// Kept as low as the hardware allows: the empty reading has been seen to
+// drift by up to about ±15 g, and even a light plastic cup is 30 g or more.
+#define CUP_PRESENT_G    20.0f
 
 // 1 mL of water weighs 1 g. Kept named so the intent is obvious at the call site.
 #define ML_PER_GRAM 1.0f

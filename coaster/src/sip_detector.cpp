@@ -22,6 +22,10 @@ float lastSettled = 0;    // most recent weight that held still
 float lastReading = 0;
 bool haveBaseline = false;
 
+// A reminder began with nothing on the coaster: ignore everything until a
+// cup (at least CUP_PRESENT_G) is set down, then use it as the baseline.
+bool waitingForCup = false;
+
 // A new level that has settled but not yet held for SETTLE_HOLD_MS.
 float candidate = 0;
 unsigned long candidateSince = 0;   // 0 = no candidate
@@ -129,9 +133,21 @@ Event poll() {
   if (millis() - candidateSince < SETTLE_HOLD_MS) return out;
   candidateSince = 0;
 
-  // Nothing on the coaster: she has picked the cup up, and is probably
-  // drinking. That is not a sip of the whole cup. Leave the baseline alone
-  // and judge the change when the cup comes back down.
+  // The reminder started on an empty coaster. Nothing counts until a cup is
+  // set down; that cup's weight is the baseline, not a refill.
+  if (waitingForCup) {
+    lastSettled = value;
+    if (value >= CUP_PRESENT_G) {
+      baseline = value;
+      waitingForCup = false;
+      Serial.printf("[SIP] cup set down, baseline %.1f g\n", baseline);
+    }
+    return out;
+  }
+
+  // Nothing on the coaster: the cup has been picked up, probably to drink.
+  // That is not a sip of the whole cup. Leave the baseline alone and judge
+  // the change when the cup comes back down.
   if (value < CUP_PRESENT_G) {
     lastSettled = value;
     return out;
@@ -159,9 +175,16 @@ Event poll() {
 }
 
 void resetBaseline() {
-  baseline = lastSettled;
   haveBaseline = true;
-  Serial.printf("[SIP] baseline reset to %.1f g\n", baseline);
+  if (lastSettled >= CUP_PRESENT_G) {
+    // Something past the threshold is on the coaster: that is the cup.
+    baseline = lastSettled;
+    waitingForCup = false;
+    Serial.printf("[SIP] cup on the coaster, baseline %.1f g\n", baseline);
+  } else {
+    waitingForCup = true;
+    Serial.println(F("[SIP] coaster empty: waiting for a cup before counting"));
+  }
 }
 
 void tareScale() {
@@ -172,6 +195,7 @@ void tareScale() {
   lastSettled = 0;
   baseline = 0;
   haveBaseline = false;
+  waitingForCup = false;
   candidateSince = 0;
   Serial.println(F("[SIP] tared (zero saved)"));
 }

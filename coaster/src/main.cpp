@@ -316,7 +316,7 @@ void setup() {
 }
 
 void loop() {
-  watch::tick();
+  watch::tick(api::online());
   lights::tick();
   handleWeight();
   runReminderTiming();

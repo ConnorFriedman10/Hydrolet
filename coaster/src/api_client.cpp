@@ -90,9 +90,11 @@ bool wifiFromFlash = false;
 unsigned long nextAttempt = 0;
 uint8_t lastReason = 0;
 volatile bool ownDisconnect = false;   // set while we abort an attempt ourselves
+bool lastFailedNotFound = false;       // last attempt ended "network not found"
 
 constexpr uint8_t MAX_SCAN = 20;
 String scanned[MAX_SCAN];
+bool scannedEnterprise[MAX_SCAN];   // needs a username/password login (NUwave)
 uint8_t scannedCount = 0;
 
 void loadCredentials() {
@@ -118,28 +120,79 @@ const char* reasonText(uint8_t r) {
   }
 }
 
-}  // namespace
+/**
+ * A network name reduced to lowercase letters and digits, so names that differ
+ * only in case, spacing, punctuation or apostrophe style compare equal:
+ * "Henry's iPhone (2)" and the iPhone's own "Henry’s iPhone (2)" both become
+ * "henrysiphone2". Non-ASCII bytes (the curly apostrophe is three of them)
+ * are dropped along with punctuation.
+ */
+String simplified(const String& name) {
+  String out;
+  for (unsigned int i = 0; i < name.length(); i++) {
+    const char c = name[i];
+    if (c >= 'A' && c <= 'Z') out += (char)(c - 'A' + 'a');
+    else if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) out += c;
+  }
+  return out;
+}
 
-void scanNetworks() {
+/**
+ * The network to join: the configured name if the last scan heard it,
+ * otherwise a heard network whose simplified name matches. Falls back to the
+ * configured name, so a hidden network still gets tried.
+ */
+String resolveSsid() {
+  for (uint8_t i = 0; i < scannedCount; i++) {
+    if (scanned[i] == wifiSsid) return wifiSsid;
+  }
+  const String want = simplified(wifiSsid);
+  if (want.length() > 0) {
+    for (uint8_t i = 0; i < scannedCount; i++) {
+      if (simplified(scanned[i]) == want) {
+        Serial.printf("[API] '%s' not heard; using similar network '%s'\n",
+                      wifiSsid.c_str(), scanned[i].c_str());
+        return scanned[i];
+      }
+    }
+  }
+  return wifiSsid;
+}
+
+/** Fills the scan list. Verbose prints every network; quiet just refreshes. */
+void scanInto(bool verbose) {
   // A scan cannot run while a join is in progress.
   WiFi.disconnect(false, false);
   const int n = WiFi.scanNetworks();
   scannedCount = 0;
-  bool found = false;
-  Serial.printf("[API] scan: %d networks (2.4 GHz only — 5 GHz is invisible to this chip)\n", n < 0 ? 0 : n);
   for (int i = 0; i < n && i < MAX_SCAN; i++) {
+    scannedEnterprise[scannedCount] = WiFi.encryptionType(i) == WIFI_AUTH_WPA2_ENTERPRISE
+                                      || WiFi.encryptionType(i) == WIFI_AUTH_WPA3_ENTERPRISE
+                                      || WiFi.encryptionType(i) == WIFI_AUTH_WPA2_WPA3_ENTERPRISE;
     scanned[scannedCount++] = WiFi.SSID(i);
-    const bool match = WiFi.SSID(i) == wifiSsid;
-    found |= match;
-    Serial.printf("[API] %2d %s %-32s ch%-2d %4ddBm %s\n", i + 1, match ? "*" : " ",
-                  WiFi.SSID(i).c_str(), WiFi.channel(i), WiFi.RSSI(i),
-                  WiFi.encryptionType(i) == WIFI_AUTH_WPA2_ENTERPRISE ? "enterprise (needs WIFI_EAP_* in secrets.h)" : "");
   }
-  if (!found) {
-    Serial.printf("[API] '%s' is not in the scan: check the exact name, and that the hotspot is on "
-                  "2.4 GHz (iPhone: Maximize Compatibility)\n", wifiSsid.c_str());
+  if (verbose) {
+    Serial.printf("[API] scan: %d networks (2.4 GHz only — 5 GHz is invisible to this chip)\n", n < 0 ? 0 : n);
+    for (int i = 0; i < n && i < MAX_SCAN; i++) {
+      const bool match = simplified(WiFi.SSID(i)) == simplified(wifiSsid);
+      Serial.printf("[API] %2d %s %-32s ch%-2d %4ddBm %s\n", i + 1, match ? "*" : " ",
+                    WiFi.SSID(i).c_str(), WiFi.channel(i), WiFi.RSSI(i),
+                    WiFi.encryptionType(i) == WIFI_AUTH_WPA2_ENTERPRISE ? "enterprise" : "");
+    }
   }
   WiFi.scanDelete();
+}
+
+}  // namespace
+
+void scanNetworks() {
+  scanInto(true);
+  bool heard = false;
+  for (uint8_t i = 0; i < scannedCount; i++) heard |= simplified(scanned[i]) == simplified(wifiSsid);
+  if (!heard) {
+    Serial.printf("[API] '%s' (or anything like it) is not in the scan: check the name, and that "
+                  "the hotspot is on 2.4 GHz (iPhone: Maximize Compatibility)\n", wifiSsid.c_str());
+  }
   nextAttempt = 0;   // reconnect straight away
 }
 
@@ -187,7 +240,7 @@ bool ensureWifi() {
   if (WiFi.status() == WL_CONNECTED) {
     if (!wasConnected) {
       wasConnected = true;
-      Serial.printf("[API] wifi up on '%s', ip %s, %d dBm\n", wifiSsid.c_str(),
+      Serial.printf("[API] wifi up on '%s', ip %s, %d dBm\n", WiFi.SSID().c_str(),
                     WiFi.localIP().toString().c_str(), WiFi.RSSI());
     }
     return true;
@@ -204,6 +257,7 @@ bool ensureWifi() {
     nextAttempt = millis() + 25000;
     if (lastReason) {
       Serial.printf("[API] last attempt failed: reason %u, %s\n", lastReason, reasonText(lastReason));
+      lastFailedNotFound = lastReason == 201;
       lastReason = 0;
     }
     // Abandon whatever attempt is still pending, so this one is not refused.
@@ -212,12 +266,23 @@ bool ensureWifi() {
     delay(100);
     ownDisconnect = false;
 
+    // Last attempt said "network not found", or nothing has been scanned yet:
+    // look again, so a near-miss name (apostrophe style, case, spacing) can
+    // be matched to what is actually on the air.
+    if (lastFailedNotFound || scannedCount == 0) scanInto(false);
+    lastFailedNotFound = false;
+    const String target = resolveSsid();
+
 #ifdef WIFI_EAP_USERNAME
     // Enterprise login (NUwave, eduroam): a username and password checked by
-    // the university's server, instead of one shared Wi-Fi password. The
-    // credentials belong to the secrets.h network only, so a network picked
-    // with `ssid` still joins the normal way.
-    if (wifiSsid == WIFI_SSID) {
+    // the university's server, instead of one shared Wi-Fi password. Used
+    // only when the scan shows the network really asks for one, so the EAP
+    // lines in secrets.h can stay put while joining an ordinary hotspot.
+    bool enterprise = false;
+    for (uint8_t i = 0; i < scannedCount; i++) {
+      if (scanned[i] == target) enterprise = scannedEnterprise[i];
+    }
+    if (enterprise) {
 #ifndef WIFI_EAP_IDENTITY
 #define WIFI_EAP_IDENTITY WIFI_EAP_USERNAME
 #endif
@@ -228,15 +293,15 @@ bool ensureWifi() {
       Serial.println(F("[API] warning: no WIFI_EAP_CA_PEM, so the network's identity is not checked"));
 #endif
       Serial.printf("[API] connecting to '%s' (WPA2-Enterprise PEAP, as %s)\n",
-                    wifiSsid.c_str(), WIFI_EAP_USERNAME);
-      WiFi.begin(wifiSsid.c_str(), WPA2_AUTH_PEAP, WIFI_EAP_IDENTITY, WIFI_EAP_USERNAME,
+                    target.c_str(), WIFI_EAP_USERNAME);
+      WiFi.begin(target.c_str(), WPA2_AUTH_PEAP, WIFI_EAP_IDENTITY, WIFI_EAP_USERNAME,
                  WIFI_EAP_PASSWORD, ca);
       return false;
     }
 #endif
 
-    Serial.printf("[API] connecting to '%s'\n", wifiSsid.c_str());
-    WiFi.begin(wifiSsid.c_str(), wifiPass.c_str());
+    Serial.printf("[API] connecting to '%s'\n", target.c_str());
+    WiFi.begin(target.c_str(), wifiPass.c_str());
   }
   return false;
 }
@@ -369,5 +434,7 @@ void drainQueue() {
 }
 
 uint8_t queueDepth() { return queueCount; }
+
+bool online() { return WiFi.status() == WL_CONNECTED; }
 
 }  // namespace api

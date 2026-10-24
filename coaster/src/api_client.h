@@ -30,6 +30,9 @@ void begin();
 /** Connects, or reconnects after a drop. Safe to call repeatedly. */
 bool ensureWifi();
 
+/** True while Wi-Fi is connected. */
+bool online();
+
 // --- Wi-Fi setup over serial (saved in flash, overrides secrets.h) --------
 /** Lists nearby 2.4 GHz networks, numbered for setWifiSsid(). */
 void scanNetworks();

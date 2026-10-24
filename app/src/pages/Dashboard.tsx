@@ -42,7 +42,12 @@ export default function Dashboard() {
 
   const loadDevices = useCallback(async () => {
     if (!supabase || !subjectId) return
-    const { data } = await supabase.from('devices').select('*').eq('owner_id', subjectId)
+    // Named columns, not '*': the secret hash column is not readable by
+    // clients, and asking for it makes Postgres refuse the whole query.
+    const { data, error } = await supabase.from('devices')
+      .select('id, owner_id, type, last_seen, pending_command')
+      .eq('owner_id', subjectId)
+    if (error) console.error('[dashboard] devices:', error.message)
     setDevices((data ?? []) as Device[])
   }, [subjectId])
 

@@ -9,8 +9,12 @@ namespace watch {
 
 void begin();
 
-/** Call every loop: reconnects after the watch goes out of range. */
-void tick();
+/**
+ * Call every loop: reconnects after the watch goes out of range. With
+ * allowed = false (Wi-Fi is down) it drops the link and stops scanning, so
+ * Wi-Fi gets the shared radio to itself until it reconnects.
+ */
+void tick(bool allowed);
 
 bool connected();
 

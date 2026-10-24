@@ -81,7 +81,19 @@ void begin() {
   NimBLEDevice::setPower(9);   // dBm in NimBLE 2.x
 }
 
-void tick() {
+void tick(bool allowed) {
+  // Wi-Fi first. Wi-Fi and BLE share one radio, and while the watch link was
+  // up the NUwave (WPA2-Enterprise) login never completed. Without Wi-Fi the
+  // coaster has no clock and no schedule, so the watch has nothing to do anyway.
+  if (!allowed) {
+    if (connected()) {
+      Serial.println(F("[BLE] wifi down: pausing the watch link until it is back"));
+      client->disconnect();
+    }
+    commandChar = nullptr;
+    eventsChar = nullptr;
+    return;
+  }
   if (connected()) return;
   if (millis() < nextScanAt) return;
   nextScanAt = millis() + SCAN_INTERVAL_MS;   // Wi-Fi shares this radio
