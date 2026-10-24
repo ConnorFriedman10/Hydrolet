@@ -6,6 +6,7 @@
   --text: #14213d;
   --muted: #667085;
   --line: #e4e9f0;
+  --red: #c0392b;
 }
 
 * { box-sizing: border-box; }
@@ -24,7 +25,13 @@ body {
   padding: 0 16px 88px;
 }
 
-header { padding: 16px 0 8px; }
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 0 8px;
+}
 h1 { margin: 0; font-size: 1.4rem; color: var(--blue); }
 h2 { margin: 0 0 8px; font-size: 1.05rem; }
 
@@ -35,11 +42,78 @@ main { display: flex; flex-direction: column; gap: 12px; }
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
+/* Forms */
+label { display: flex; flex-direction: column; gap: 4px; font-size: 0.9rem; color: var(--muted); }
+input, select {
+  font: inherit;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--text);
+  min-height: 48px;
+}
+
+button {
+  font: inherit;
+  font-weight: 600;
+  min-height: 48px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--blue);
+  color: #fff;
+  cursor: pointer;
+}
+button:disabled { opacity: 0.5; cursor: default; }
+button.secondary { background: #e8f1fc; color: var(--blue); }
+button.link {
+  background: none;
+  color: var(--blue);
+  min-height: 0;
+  padding: 4px 0;
+  font-weight: 500;
+}
+
+/* Lists */
+.list { list-style: none; margin: 0; padding: 0; }
+.list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.list li:last-child { border-bottom: 0; }
+
+/* Text helpers */
 .muted { color: var(--muted); }
 .muted li { margin-bottom: 4px; }
+.small { font-size: 0.85rem; margin: 0; }
+.error { color: var(--red); margin: 0; }
+.center { text-align: center; padding: 48px 0; }
+.big { font-size: 2rem; font-weight: 700; }
+.code { letter-spacing: 0.15em; font-family: ui-monospace, monospace; }
+code { font-family: ui-monospace, monospace; font-size: 0.9em; }
 
+/* Login screen */
+.login {
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 64px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  text-align: center;
+}
+.login form { text-align: left; }
+
+/* Bottom nav */
 nav {
   position: fixed;
   left: 0;
@@ -47,6 +121,7 @@ nav {
   bottom: 0;
   display: flex;
   justify-content: space-around;
+  align-items: center;
   background: var(--card);
   border-top: 1px solid var(--line);
   padding: 10px 8px calc(10px + env(safe-area-inset-bottom));

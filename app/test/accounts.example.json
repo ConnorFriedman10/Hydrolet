@@ -1,0 +1,4 @@
+{
+  "main":      { "email": "friedman.connor99@gmail.com", "password": "CONNOR_PASSWORD_HERE" },
+  "caregiver": { "email": "hgao135@gmail.com",           "password": "HENRY_PASSWORD_HERE" }
+}

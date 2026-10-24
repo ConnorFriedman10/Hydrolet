@@ -9,3 +9,4 @@ supabase/.temp/
 # Kiro / editor local state
 .kiro/settings/
 .mcp.json
+app/test/accounts.json
