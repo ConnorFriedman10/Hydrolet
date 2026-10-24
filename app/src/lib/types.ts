@@ -2,6 +2,7 @@ export type Profile = {
   id: string
   name: string
   caregiver_code: string
+  caretaker_of: string[]
   daily_goal_ml: number
   schedule: { reminders: string[] }
   timezone: string

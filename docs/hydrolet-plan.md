@@ -41,8 +41,7 @@ These are the only things both halves depend on. If either person needs to chang
 ### Database tables (Supabase Postgres)
 
 ```
-profiles            id (= auth user id), name, caregiver_code (unique), daily_goal_ml, schedule (json)
-caregiver_links     caregiver_id, main_id
+profiles            id (= auth user id), name, caregiver_code (unique), caretaker_of (list of account ids), daily_goal_ml, schedule (json)
 events              id, main_id, type (reminder/sip/refill/completed/ignored), amount_ml, created_at
 summaries           main_id, date, total_ml, goal_ml, reminders_sent, reminders_ignored
 devices             id, owner_id, type (coaster/watch), device_secret_hash, last_seen, pending_command
