@@ -101,7 +101,9 @@ void startReminder(const char* slotId, int amountMl) {
 void finishReminder(const char* how) {
   api::sendEvent(how, reminderId, "", -1);
   watch::clear();
-  lights::off();
+  // She drank enough: say so. Ignored: just go dark.
+  if (strcmp(how, "completed") == 0) lights::celebrate();
+  else lights::off();
   state = State::Idle;
   Serial.printf("[CYCLE] reminder %s (%d of %d mL)\n", how, drunkMl, targetMl);
 }
@@ -249,6 +251,15 @@ void handleSerial() {
   } else if (line == "test") {
     lights::selfTest();
     watch::test();
+  } else if (line == "sweep") {
+    // The whole reminder's light show in 8 seconds: green to red, then the finish.
+    for (int i = 0; i <= 20; i++) { lights::showProgress(i / 20.0f); delay(350); }
+    lights::celebrate();
+    Serial.println(F("[LED] sweep done, finish animation running"));
+  } else if (line == "ledcount") {
+    Serial.printf("[LED] lighting 200 pixels for 20 s (configured: %d). Every 10th is red.\n", LED_COUNT);
+    lights::countTest(200, 20000);
+    Serial.println(F("[LED] count test done"));
   } else if (line == "tare") {
     sip::tareScale();
   } else if (line.startsWith("cal ")) {

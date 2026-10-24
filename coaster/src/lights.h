@@ -17,8 +17,17 @@ void showProgress(float fraction);
 /** Brief confirmation that a sip registered, then back to the progress colour. */
 void blinkSip();
 
+/** Target reached: full red, a few on/off flashes, then off. Non-blocking. */
+void celebrate();
+
 /** Startup / `test` serial command. */
 void selfTest();
+
+/**
+ * Diagnostic: lights `upTo` pixels dimly (every 10th red) for holdMs, so the
+ * real number of pixels on the ring can be counted. Blocks while lit.
+ */
+void countTest(uint16_t upTo, unsigned long holdMs);
 
 /** Call every loop; drives the blink timing without blocking. */
 void tick();

@@ -8,13 +8,21 @@
 #define PIN_LED_DATA   D2
 
 // --- LED ring --------------------------------------------------------------
-#define LED_COUNT      18
+// At least as many as the ring really has; extra pixels cost nothing (the
+// data just runs off the end). 18 lit only a quarter of the ring, and the
+// 200-pixel `ledcount` test covered all of it.
+#define LED_COUNT      200
 
-// Full white on 18 WS2812Bs is about 1.1 A, which would brown out a 1 A
-// supply with the ESP32-C3 also drawing from it. The ring never shows white —
-// green through red uses at most two channels — but this cap keeps the worst
-// case near 250 mA. Raise it only after testing with the real adapter.
-#define LED_BRIGHTNESS 90   // of 255
+// Current scales with the pixels that really exist, not LED_COUNT. With the
+// ring around 70+ pixels, amber (the brightest step: red and green both full)
+// at 40/255 is roughly 450 mA, which a USB supply can carry alongside the
+// ESP32-C3. The old 90 would have been about 1 A and could reset the board.
+// Raise it only after measuring the real draw.
+#define LED_BRIGHTNESS 40   // of 255
+
+// Target reached: the ring flashes red this many times, then goes off.
+#define DONE_FLASHES   4
+#define DONE_FLASH_MS  250UL   // each on, and each off
 
 // --- Load cell -------------------------------------------------------------
 // Counts per gram. Find it by putting a known weight on the coaster and
