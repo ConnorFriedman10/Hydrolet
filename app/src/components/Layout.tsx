@@ -3,6 +3,7 @@ import { NavLink, Outlet, useSearchParams } from 'react-router-dom'
 import { useSubject } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 import { disablePush } from '../lib/push'
+import Drop from './Drop'
 
 // Forget this device's push subscription first, so the next person to sign in
 // on it doesn't get the previous account's notifications.
@@ -35,27 +36,32 @@ export default function Layout() {
   return (
     <div className="app">
       <header>
-        <h1>Hydrolet</h1>
-        {subjects.length > 1 && subject && (
-          <select value={subject.id} onChange={(e) => select(e.target.value)} aria-label="Viewing account">
-            {subjects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.id === me?.id ? 'My account' : (p.name || 'Unnamed')}
-              </option>
-            ))}
-          </select>
-        )}
+        <div className="brand">
+          <Drop />
+          <h1>Hydrolet</h1>
+        </div>
+        <div className="header-tools">
+          {subjects.length > 1 && subject && (
+            <select value={subject.id} onChange={(e) => select(e.target.value)} aria-label="Viewing account">
+              {subjects.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.id === me?.id ? 'My account' : (p.name || 'Unnamed')}
+                </option>
+              ))}
+            </select>
+          )}
+          <button className="link" onClick={logOut}>Log out</button>
+        </div>
       </header>
 
       <main>
         <Outlet />
       </main>
 
-      <nav>
+      <nav aria-label="Main">
         {tabs.map((t) => (
           <NavLink key={t.to} to={t.to} end={t.end}>{t.label}</NavLink>
         ))}
-        <button className="link" onClick={logOut}>Log out</button>
       </nav>
     </div>
   )

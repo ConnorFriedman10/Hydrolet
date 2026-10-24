@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { supabase } from '../lib/supabase'
+import Drop from '../components/Drop'
 
 export default function Login() {
   const [mode, setMode] = useState<'login' | 'signup'>('login')
@@ -33,7 +34,10 @@ export default function Login() {
 
   return (
     <div className="login">
-      <h1>Hydrolet</h1>
+      <div className="brand">
+        <Drop size={64} />
+        <h1>Hydrolet</h1>
+      </div>
       <p className="muted">Hydration reminders for the people you love.</p>
 
       <form onSubmit={submit} className="card">

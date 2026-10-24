@@ -168,15 +168,17 @@ export default function Dashboard() {
         <button onClick={() => command('remindNow', 'Reminder sent. It may take a few seconds.')}>
           Send a reminder now
         </button>
-        <div className="row">
+        <p className="group-label" id="timelapse-label">Time-lapse</p>
+        <p className="muted small">Makes each reminder's buzzes and timeout 30 times faster, for demos.</p>
+        <div className="row" role="group" aria-labelledby="timelapse-label">
           <button className="secondary" onClick={() => command('timelapse_on', 'Time-lapse on.')}>
-            Time-lapse on
+            On
           </button>
           <button className="secondary" onClick={() => command('timelapse_off', 'Time-lapse off.')}>
-            Time-lapse off
+            Off
           </button>
         </div>
-        {msg && <p className="muted small">{msg}</p>}
+        {msg && <p className="muted small" role="status">{msg}</p>}
       </section>
     </>
   )

@@ -3,8 +3,8 @@
   "short_name": "Hydrolet",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#0b6bcb",
+  "background_color": "#eef8fc",
+  "theme_color": "#0a6fb8",
   "icons": [
     { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ]

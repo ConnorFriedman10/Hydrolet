@@ -94,11 +94,13 @@ export default function Schedule() {
         <p className="muted small">
           Confirm this with a doctor. Some people are on a fluid limit.
         </p>
-        <label>Goal (mL)
-          <input type="number" min={100} max={6000} step={50} value={goal}
-            onChange={(e) => setGoal(Number(e.target.value))} />
-        </label>
-        <button className="secondary" onClick={saveGoal}>Save goal</button>
+        <div className="inline">
+          <label>Goal (mL)
+            <input type="number" min={100} max={6000} step={50} value={goal}
+              onChange={(e) => setGoal(Number(e.target.value))} />
+          </label>
+          <button className="secondary" onClick={saveGoal}>Save</button>
+        </div>
       </section>
 
       <section className="card">
@@ -169,8 +171,8 @@ export default function Schedule() {
             </label>
           </div>
 
-          <label>Repeats on</label>
-          <div className="row">
+          <p className="group-label" id="repeats-label">Repeats on</p>
+          <div className="row" role="group" aria-labelledby="repeats-label">
             <button className="secondary" onClick={() => setDraft({ ...draft, days: EVERY_DAY })}>Every day</button>
             <button className="secondary" onClick={() => setDraft({ ...draft, days: WEEKDAYS })}>Weekdays</button>
             <button className="secondary" onClick={() => setDraft({ ...draft, days: WEEKENDS })}>Weekends</button>
