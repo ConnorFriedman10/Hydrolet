@@ -24,6 +24,7 @@
 //   5. Coaster writes commands to HYDROLET_CHAR_COMMAND characteristic
 //   6. Band responds by controlling LED and motor
 //   7. Band can notify coaster via HYDROLET_CHAR_EVENTS characteristic
+//   8. On disconnect: Advertising automatically restarts for reconnection
 //
 // BLE PROTOCOL (from shared/ble_protocol.h):
 //   Service UUID: 3518a23d-30b7-4c54-88a1-eaf73b3cc524
@@ -50,9 +51,10 @@
 //      - Write 0x03 -> LED off
 //   5. Enable notifications on Events characteristic (ec66bf06...)
 //      - After sending 0x01, you'll receive 0x01 notification
+//   6. Disconnect and reconnect - should work every time
 //
 // SERIAL MONITOR (115200 baud):
-//   Shows connection events and received commands for debugging
+//   Shows connection events, received commands, and advertising status
 //
 // =====================================================================
 
@@ -111,6 +113,10 @@ void disconnect_callback(uint16_t conn_handle, uint8_t reason) {
   (void)reason;
   digitalWrite(LED, LOW);  // turn off LED on disconnect
   Serial.println("[BLE] coaster disconnected");
+  
+  // Explicitly restart advertising (restartOnDisconnect should do this, but be explicit)
+  Bluefruit.Advertising.start(0);
+  Serial.println("[BLE] advertising restarted");
 }
 
 void cmd_write_callback(uint16_t conn_hdl, BLECharacteristic* chr, uint8_t* data, uint16_t len) {
