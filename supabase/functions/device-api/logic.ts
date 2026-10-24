@@ -88,15 +88,21 @@ export function parseEvent(body: unknown): EventInput | string {
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 /**
- * The account's local wall clock: "HH:MM" and the weekday index
- * (0 = Sunday, matching days_mask bit 0).
+ * The account's local wall clock: "HH:MM", the local date "YYYY-MM-DD", and
+ * the weekday index (0 = Sunday, matching days_mask bit 0).
  */
-export function localClock(timezone: string, at: Date = new Date()): { now: string; weekday: number } {
+export function localClock(
+  timezone: string,
+  at: Date = new Date(),
+): { now: string; date: string; weekday: number } {
   let parts: Intl.DateTimeFormatPart[]
   try {
     parts = new Intl.DateTimeFormat('en-US', {
       timeZone: timezone,
       hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
       weekday: 'short',
@@ -108,7 +114,11 @@ export function localClock(timezone: string, at: Date = new Date()): { now: stri
   const get = (t: string) => parts.find((p) => p.type === t)?.value ?? ''
   // Some engines render midnight as "24" even with h23; normalise it.
   const hour = get('hour') === '24' ? '00' : get('hour').padStart(2, '0')
-  return { now: `${hour}:${get('minute').padStart(2, '0')}`, weekday: WEEKDAYS.indexOf(get('weekday')) }
+  return {
+    now: `${hour}:${get('minute').padStart(2, '0')}`,
+    date: `${get('year')}-${get('month')}-${get('day')}`,
+    weekday: WEEKDAYS.indexOf(get('weekday')),
+  }
 }
 
 /** Today's slots in time order, in the shape the coaster parses. */

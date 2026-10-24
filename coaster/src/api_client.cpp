@@ -402,6 +402,7 @@ Checkin checkin(bool watchConnected) {
 
   out.ok = true;
   out.nowMinutes = parseMinutes(doc["now"] | "");
+  strlcpy(out.date, doc["date"] | "", sizeof(out.date));
   out.dailyGoalMl = doc["daily_goal_ml"] | 0;
   strlcpy(out.pendingCommand, doc["pending_command"] | "", sizeof(out.pendingCommand));
 

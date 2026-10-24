@@ -18,13 +18,24 @@ unsigned long nextScanAt = 0;
 void onEvent(NimBLERemoteCharacteristic*, uint8_t* data, size_t len, bool) {
   if (len < 1) return;
   if (data[0] == EVT_IGNORED) {
-    ignoredFlag = true;
-    Serial.println(F("[BLE] watch reported ignored"));
+    // The band sends this as soon as its own short buzz pattern ends, about a
+    // second into the reminder — far too early to mean "no sip". The coaster
+    // is the source of truth for hydration and runs the ignored timeout
+    // itself (three buzzes a minute apart, then IGNORED_TIMEOUT_MS), so the
+    // event is logged and otherwise left alone. Acting on it ended every
+    // reminder as "ignored" before anyone could drink.
+    Serial.println(F("[BLE] watch finished its buzz pattern"));
+  } else if (data[0] == EVT_BUTTON_PRESS) {
+    Serial.println(F("[BLE] watch button pressed"));
   }
 }
 
 bool write(uint8_t command) {
-  if (!commandChar) return false;
+  if (!commandChar) {
+    Serial.printf("[BLE] watch not connected, command %u not sent\n", command);
+    return false;
+  }
+  Serial.printf("[BLE] -> watch command %u\n", command);
   if (!commandChar->writeValue(&command, 1, false)) {
     Serial.printf("[BLE] write %u failed\n", command);
     return false;
@@ -67,6 +78,9 @@ void connectToWatch() {
     eventsChar = service->getCharacteristic(HYDROLET_CHAR_EVENTS);
     if (eventsChar && eventsChar->canNotify()) eventsChar->subscribe(true, onEvent);
 
+    if (!commandChar) {
+      Serial.println(F("[BLE] watch has no command characteristic; check shared/ble_protocol.h"));
+    }
     Serial.println(F("[BLE] watch connected"));
     scan->clearResults();
     return;
@@ -75,6 +89,28 @@ void connectToWatch() {
 }
 
 }  // namespace
+
+void scanReport(unsigned long ms) {
+  if (connected()) {
+    Serial.printf("[BLE] already connected to the watch at %s\n",
+                  client->getPeerAddress().toString().c_str());
+    return;
+  }
+  NimBLEScan* scan = NimBLEDevice::getScan();
+  scan->setActiveScan(true);
+  NimBLEScanResults found = scan->getResults(ms, false);
+  Serial.printf("[BLE] scan %lu ms: %d devices\n", ms, found.getCount());
+  for (int i = 0; i < found.getCount(); i++) {
+    const NimBLEAdvertisedDevice* dev = found.getDevice(i);
+    const bool hydrolet = dev->isAdvertisingService(NimBLEUUID(HYDROLET_SERVICE_UUID));
+    const std::string name = dev->getName();
+    // Unnamed devices without the service are just noise (phones, laptops).
+    if (!hydrolet && name.empty()) continue;
+    Serial.printf("[BLE]   %s %4d dBm  %-20s%s\n", dev->getAddress().toString().c_str(),
+                  dev->getRSSI(), name.c_str(), hydrolet ? "  <- Hydrolet service" : "");
+  }
+  scan->clearResults();
+}
 
 void begin() {
   NimBLEDevice::init("hydrolet-coaster");

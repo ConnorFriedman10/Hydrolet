@@ -144,7 +144,9 @@ export default function Dashboard() {
 
       <section className="card">
         <h2>Devices</h2>
-        {(['coaster', 'watch'] as const).map((type) => {
+        {/* Watch hidden for now: it pairs with the coaster over Bluetooth and
+            has no row of its own yet. Add 'watch' back here once it does. */}
+        {(['coaster'] as const).map((type) => {
           // If a device was re-registered, the old row lingers; show the one
           // that has checked in most recently.
           const d = devices

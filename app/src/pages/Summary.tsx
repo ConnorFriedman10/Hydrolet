@@ -91,6 +91,18 @@ export default function Summary() {
     setReportBusy(false)
   }
 
+  // The database keeps summaries current as events arrive and the goal
+  // changes, so the history list just listens.
+  useEffect(() => {
+    if (!supabase || !subjectId) return
+    const channel = supabase.channel(`summaries-${subjectId}`)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'summaries', filter: `main_id=eq.${subjectId}` },
+        () => loadHistory())
+      .subscribe()
+    return () => { supabase?.removeChannel(channel) }
+  }, [subjectId, loadHistory])
+
   // Today stays live, so a time-lapse run fills in as it happens.
   useEffect(() => {
     if (!supabase || !subjectId || !isToday) return

@@ -123,6 +123,9 @@ async function handleCheckin(device: Device, body: unknown): Promise<Response> {
 
   return json(200, {
     now: clock.now,
+    // Lets the coaster tell "same day, after a restart" from "a new day", so
+    // it can remember across reboots which of today's reminders already fired.
+    date: clock.date,
     today_reminders: todayReminders((slots.data ?? []) as SlotRow[], clock.weekday),
     daily_goal_ml,
     pending_command: command,

@@ -34,14 +34,23 @@
 // with a standard deviation of about 5 g (four 50 kg cells give only ~14
 // counts per gram). So stillness is judged on the scatter of a window, and
 // the weight is that window's average, which is good to about ±1.5 g.
-#define SETTLE_SAMPLES   16     // window of readings judged together
+//
+// Together, SETTLE_SAMPLES and SETTLE_HOLD_MS are how long after the cup is set
+// down a sip shows on the ring: at the HX711's 10 readings a second, 10 samples
+// is 1 s to fill the window, then 1 s of hold, so about 2 s. (It was 16 and
+// 2000 ms, about 3.6 s.) Ten samples still average to about ±1.6 g.
+#define SETTLE_SAMPLES   10     // window of readings judged together
 #define SETTLE_MAX_SD    8.0f   // grams; above this the cup is moving
 #define SETTLE_TOLERANCE 4.0f   // grams; a smaller shift in the average is the same weight
-#define MIN_SIP_G        8.0f   // smaller changes are noise, not a sip
+// Smaller changes are noise, not a sip. Keep it above SETTLE_TOLERANCE: a
+// change smaller than that never even registers as a new weight.
+#define MIN_SIP_G        5.0f
 // Load cells creep for a second or two after a cup is set down (measured: a
 // reading 8 g low that climbed to its true value). A new weight only counts
-// once it has stayed within SETTLE_TOLERANCE for this long.
-#define SETTLE_HOLD_MS   2000UL
+// once it has stayed within SETTLE_TOLERANCE for this long. Shorter means a
+// faster ring, at the cost of reading a sip a few grams large while the cells
+// are still creeping; raise it back towards 2000 if sips come out too big.
+#define SETTLE_HOLD_MS   1000UL
 // Below this, nothing is on the coaster; at or above it, that is the cup.
 // Kept as low as the hardware allows: the empty reading has been seen to
 // drift by up to about ±15 g, and even a light plastic cup is 30 g or more.

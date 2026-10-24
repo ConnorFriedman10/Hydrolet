@@ -19,6 +19,7 @@ constexpr uint8_t MAX_REMINDERS = 12;
 struct Checkin {
   bool ok = false;
   int nowMinutes = -1;              // the account's local time
+  char date[11] = "";               // the account's local date, "YYYY-MM-DD"
   Reminder reminders[MAX_REMINDERS];
   uint8_t reminderCount = 0;
   int dailyGoalMl = 0;

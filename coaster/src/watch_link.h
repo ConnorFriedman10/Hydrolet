@@ -29,6 +29,9 @@ void clear();
 
 void test();
 
+/** Diagnostic: scans for ms and lists named devices, marking any Hydrolet watch. */
+void scanReport(unsigned long ms);
+
 /** True once since the last call: the watch reported an ignored reminder. */
 bool takeIgnoredFlag();
 

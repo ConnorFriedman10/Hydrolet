@@ -16,6 +16,7 @@
 // one makes sure she drinks its own amount. Anything else is a bonus.
 
 #include <Arduino.h>
+#include <Preferences.h>
 #include <esp_random.h>
 
 #include "api_client.h"
@@ -32,7 +33,7 @@ State state = State::Idle;
 
 // --- the reminder currently running --------------------------------------
 char reminderId[40] = "";       // a new UUID per firing, groups its events
-char reminderSlotId[40] = "";   // empty for an on-demand "remind her now"
+char reminderSlotId[40] = "";   // empty for an on-demand "Send a reminder now"
 int targetMl = 0;
 int drunkMl = 0;
 unsigned long lastBuzzAt = 0;
@@ -43,7 +44,65 @@ bool sawFirstSip = false;
 api::Checkin schedule;
 char firedToday[api::MAX_REMINDERS][40];
 uint8_t firedCount = 0;
+char firedDate[11] = "";        // the local date firedToday belongs to
 int lastNowMinutes = -1;
+
+// --- survives a restart ----------------------------------------------------
+// Which of today's reminders already fired, and the reminder that was running
+// when the power went. Without this, a restart replays every reminder from
+// the last MISSED_GRACE_MIN minutes, and the interrupted one stays open on the
+// dashboard forever because nothing ever closes it.
+Preferences cycle;
+
+void saveFired() {
+  String joined;
+  for (uint8_t i = 0; i < firedCount; i++) {
+    if (i) joined += ',';
+    joined += firedToday[i];
+  }
+  cycle.putString("date", firedDate);
+  cycle.putString("fired", joined);
+}
+
+void loadFired() {
+  firedCount = 0;
+  if (!cycle.isKey("date")) return;
+  strlcpy(firedDate, cycle.getString("date").c_str(), sizeof(firedDate));
+  const String joined = cycle.isKey("fired") ? cycle.getString("fired") : String();
+  int from = 0;
+  while (from < (int)joined.length() && firedCount < api::MAX_REMINDERS) {
+    int comma = joined.indexOf(',', from);
+    if (comma < 0) comma = joined.length();
+    if (comma > from) strlcpy(firedToday[firedCount++], joined.substring(from, comma).c_str(), 40);
+    from = comma + 1;
+  }
+}
+
+/** Records the running reminder (or none), and how much has been drunk in it. */
+void saveOpen() {
+  cycle.putString("open", state == State::Reminding ? reminderId : "");
+  cycle.putInt("openMl", drunkMl);
+}
+
+/**
+ * How to close a reminder that ends before reaching its target: "completed"
+ * if anything was drunk (the dashboard shows the amount, e.g. "80 of 250 mL"),
+ * "ignored" if nothing was.
+ */
+const char* closingFor(int drankMl) { return drankMl > 0 ? "completed" : "ignored"; }
+
+/** At boot: close the reminder a restart cut off, so it does not stay open. */
+void closeInterrupted() {
+  if (!cycle.isKey("open")) return;
+  const String open = cycle.getString("open");
+  if (open.isEmpty()) return;
+  const int drank = cycle.getInt("openMl", 0);
+  // Queued until Wi-Fi is up, like any event.
+  api::sendEvent(closingFor(drank), open.c_str(), "", -1);
+  Serial.printf("[CYCLE] closed the reminder a restart interrupted (%s, %d mL)\n",
+                closingFor(drank), drank);
+  cycle.putString("open", "");
+}
 
 unsigned long lastCheckinAt = 0;
 bool timelapse = false;
@@ -75,6 +134,7 @@ bool alreadyFired(const char* slotId) {
 
 void markFired(const char* slotId) {
   if (firedCount < api::MAX_REMINDERS) strlcpy(firedToday[firedCount++], slotId, 40);
+  saveFired();
 }
 
 void startReminder(const char* slotId, int amountMl) {
@@ -93,18 +153,21 @@ void startReminder(const char* slotId, int amountMl) {
 
   lights::showProgress(0.0f);
   api::sendEvent("reminder", reminderId, reminderSlotId, -1);
+  saveOpen();
 
   Serial.printf("[CYCLE] reminder started, target %d mL%s\n",
                 targetMl, *reminderSlotId ? "" : " (on demand)");
 }
 
 void finishReminder(const char* how) {
-  api::sendEvent(how, reminderId, "", -1);
+  // Lights and watch first, upload after, for the same reason as in handleWeight().
   watch::clear();
   // She drank enough: say so. Ignored: just go dark.
   if (strcmp(how, "completed") == 0) lights::celebrate();
   else lights::off();
   state = State::Idle;
+  saveOpen();
+  api::sendEvent(how, reminderId, "", -1);
   Serial.printf("[CYCLE] reminder %s (%d of %d mL)\n", how, drunkMl, targetMl);
 }
 
@@ -122,9 +185,13 @@ void handleCommand(const char* command) {
   }
 }
 
-/** Fires any scheduled reminder whose time has come. */
+/**
+ * Fires any scheduled reminder whose time has come. A newly due reminder
+ * always goes out: if another one is still running (a "Send a reminder now",
+ * or an earlier slot nobody finished), that one is closed first.
+ */
 void checkSchedule() {
-  if (state != State::Idle || schedule.nowMinutes < 0) return;
+  if (schedule.nowMinutes < 0) return;
 
   for (uint8_t i = 0; i < schedule.reminderCount; i++) {
     const api::Reminder& r = schedule.reminders[i];
@@ -141,6 +208,12 @@ void checkSchedule() {
       continue;
     }
 
+    if (state == State::Reminding) {
+      Serial.printf("[CYCLE] %02d:%02d is due: closing the reminder still running\n",
+                    r.minutes / 60, r.minutes % 60);
+      finishReminder(closingFor(drunkMl));
+    }
+
     startReminder(r.id, r.amountMl);
     return;   // one at a time; the schedule forbids two at the same minute
   }
@@ -150,11 +223,29 @@ void runCheckin() {
   api::Checkin fresh = api::checkin(watch::connected());
   if (!fresh.ok) return;
 
-  // A clock that went backwards means a new day, so yesterday's firings are
-  // no longer relevant.
-  if (fresh.nowMinutes >= 0 && fresh.nowMinutes < lastNowMinutes) {
+  // A different date means a new day, so the fired list (kept across
+  // restarts) no longer applies. A server too old to send the date falls back
+  // to "the clock went backwards".
+  const bool newDay = *fresh.date
+      ? strcmp(fresh.date, firedDate) != 0
+      : (fresh.nowMinutes >= 0 && fresh.nowMinutes < lastNowMinutes);
+  if (newDay) {
+    // First start of this firmware: nothing was saved, so there is no telling
+    // what already fired today. Count everything already due as done rather
+    // than replaying it.
+    const bool firstRun = !cycle.isKey("date");
     firedCount = 0;
-    Serial.println(F("[CYCLE] new day"));
+    strlcpy(firedDate, fresh.date, sizeof(firedDate));
+    if (firstRun) {
+      for (uint8_t i = 0; i < fresh.reminderCount && firedCount < api::MAX_REMINDERS; i++) {
+        if (fresh.reminders[i].minutes <= fresh.nowMinutes) {
+          strlcpy(firedToday[firedCount++], fresh.reminders[i].id, 40);
+        }
+      }
+    }
+    saveFired();
+    Serial.printf("[CYCLE] new day %s%s\n", firedDate,
+                  firstRun ? " (first start: reminders already due are counted as done)" : "");
   }
   lastNowMinutes = fresh.nowMinutes;
 
@@ -207,19 +298,22 @@ void handleWeight() {
   const int ml = (int)lroundf(change.amountMl);
   if (ml <= 0) return;
   drunkMl += ml;
-
-  // Sent one at a time, as they happen, so the app's reminder fills in live
-  // rather than jumping at the end.
-  api::sendEvent("sip", reminderId, "", ml);
-  lights::blinkSip();
+  saveOpen();   // so a restart now closes this reminder as drunk-from, not ignored
   Serial.printf("[SIP] %d mL (%d of %d)\n", ml, drunkMl, targetMl);
 
+  // What she can see and feel comes first. The upload below blocks for up to
+  // HTTP_TIMEOUT_MS, and doing it first held the ring and the watch back by
+  // that long after every sip.
+  lights::blinkSip();
+  lights::showProgress((float)drunkMl / (float)targetMl);
   if (!sawFirstSip) {
     sawFirstSip = true;
     watch::quiet();   // she is drinking; stop buzzing, leave the light on
   }
 
-  lights::showProgress((float)drunkMl / (float)targetMl);
+  // Sent one at a time, as they happen, so the app's reminder fills in live
+  // rather than jumping at the end.
+  api::sendEvent("sip", reminderId, "", ml);
 
   if (drunkMl >= targetMl) finishReminder("completed");
 }
@@ -269,6 +363,8 @@ void handleSerial() {
     }
   } else if (line == "weigh") {
     Serial.printf("[SIP] %.1f g\n", sip::lastWeightG());
+  } else if (line == "ble") {
+    watch::scanReport(4000);
   } else if (line == "wifi") {
     api::printWifi();
   } else if (line == "wifi scan") {
@@ -311,6 +407,11 @@ void setup() {
   sip::begin();
   watch::begin();
   api::begin();
+
+  cycle.begin("cycle", false);
+  loadFired();
+  if (firedCount) Serial.printf("[CYCLE] %u reminders already fired on %s\n", firedCount, firedDate);
+  closeInterrupted();
 
   Serial.println(F("[BOOT] ready — type 'status' for state"));
 }

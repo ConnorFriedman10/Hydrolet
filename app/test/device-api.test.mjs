@@ -57,13 +57,14 @@ export async function run() {
   // Wednesday 2026-10-28 16:05 UTC = 12:05 EDT.
   {
     const c = localClock('America/New_York', new Date('2026-10-28T16:05:00Z'))
-    check('16. New York afternoon', c.now === '12:05' && c.weekday === 3, JSON.stringify(c))
+    check('16. New York afternoon', c.now === '12:05' && c.weekday === 3 && c.date === '2026-10-28', JSON.stringify(c))
   }
   // 03:30 UTC Wednesday is still Tuesday 23:30 in New York: the weekday must
   // follow the account's zone, not UTC.
   {
     const c = localClock('America/New_York', new Date('2026-10-28T03:30:00Z'))
-    check('17. weekday follows the account zone', c.now === '23:30' && c.weekday === 2, JSON.stringify(c))
+    check('17. weekday and date follow the account zone',
+      c.now === '23:30' && c.weekday === 2 && c.date === '2026-10-27', JSON.stringify(c))
   }
   {
     const c = localClock('America/New_York', new Date('2026-10-28T04:00:00Z'))
