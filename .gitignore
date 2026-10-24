@@ -1,0 +1,7 @@
+.env
+.env.local
+secrets.h
+node_modules/
+dist/
+.pio/
+supabase/.temp/
