@@ -5,3 +5,7 @@ node_modules/
 dist/
 .pio/
 supabase/.temp/
+
+# Kiro / editor local state
+.kiro/settings/
+.mcp.json
