@@ -1,2 +1,2 @@
 # Hydrolet
-A hydration reminder for the elderly
+A hydration reminder for dementia patients
