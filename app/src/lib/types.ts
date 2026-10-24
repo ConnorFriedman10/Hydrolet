@@ -4,7 +4,6 @@ export type Profile = {
   caregiver_code: string
   caretaker_of: string[]
   daily_goal_ml: number
-  schedule: { reminders: string[] }
   timezone: string
 }
 
@@ -16,7 +15,18 @@ export type HydroEvent = {
   type: EventType
   amount_ml: number | null
   reminder_id: string | null
+  reminder_slot_id: string | null
   created_at: string
+}
+
+// One entry in the weekly schedule: a time, the weekdays it fires on, and its
+// own water target. days_mask is a 7-bit value, bit 0 = Sunday.
+export type ReminderSlot = {
+  id: string
+  main_id: string
+  time_of_day: string   // "09:00:00"
+  days_mask: number
+  amount_ml: number
 }
 
 export type Device = {

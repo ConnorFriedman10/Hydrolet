@@ -19,14 +19,20 @@ This replaces the old assumption (one list of times, applied identically every d
 
 ## Data model
 
+> **Built as described, with two deviations.** The time column is named
+> `time_of_day`, not `time`, since `time` is a type name in Postgres and makes
+> for awkward SQL. And `profiles.schedule` was **not** dropped — it is empty and
+> nothing reads it, so it was left in place; the migration file notes the
+> one-line statement to drop it whenever you want.
+
 ```sql
 create table public.reminder_slots (
-  id         uuid primary key default gen_random_uuid(),
-  main_id    uuid not null references public.profiles (id) on delete cascade,
-  time       time not null,                         -- local wall-clock time, in profiles.timezone
-  days_mask  smallint not null check (days_mask between 1 and 127),  -- bit 0 = Sun ... bit 6 = Sat
-  amount_ml  integer not null check (amount_ml > 0 and amount_ml <= 2000),
-  created_at timestamptz not null default now()
+  id          uuid primary key default gen_random_uuid(),
+  main_id     uuid not null references public.profiles (id) on delete cascade,
+  time_of_day time not null,                        -- local wall-clock time, in profiles.timezone
+  days_mask   smallint not null check (days_mask between 1 and 127),  -- bit 0 = Sun ... bit 6 = Sat
+  amount_ml   integer not null check (amount_ml > 0 and amount_ml <= 2000),
+  created_at  timestamptz not null default now()
 );
 create index reminder_slots_main_idx on public.reminder_slots (main_id);
 ```

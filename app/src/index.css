@@ -7,6 +7,7 @@
   --muted: #667085;
   --line: #e4e9f0;
   --red: #c0392b;
+  --green: #1a9d52;
 }
 
 * { box-sizing: border-box; }
@@ -90,6 +91,55 @@ button.link {
   border-bottom: 1px solid var(--line);
 }
 .list li:last-child { border-bottom: 0; }
+
+.rowbtns { display: flex; gap: 12px; flex-shrink: 0; }
+
+/* Weekday picker, used for both the day tabs and the repeat selector */
+.daytabs { display: flex; gap: 4px; }
+.daytab {
+  flex: 1;
+  min-height: 40px;
+  padding: 0 2px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: #eef2f7;
+  color: var(--muted);
+}
+.daytab.on { background: var(--blue); color: #fff; }
+
+/* Progress bar */
+.bar { height: 12px; background: var(--line); border-radius: 6px; overflow: hidden; }
+.bar > div { height: 100%; background: var(--blue); transition: width 0.4s; }
+
+/* Today's timeline */
+.timeline { list-style: none; margin: 0; padding: 0; }
+.tl {
+  display: flex;
+  gap: 12px;
+  padding: 10px 0 10px 12px;
+  border-left: 3px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.tl:last-child { border-bottom: 0; }
+.tl-time { min-width: 72px; font-variant-numeric: tabular-nums; }
+.tl-status { font-weight: 600; }
+
+.tl.completed { border-left-color: var(--green); }
+.tl.active { border-left-color: var(--blue); }
+.tl.ignored, .tl.not-logged { border-left-color: var(--red); }
+.tl.upcoming { opacity: 0.65; }
+.tl.completed .tl-status { color: var(--green); }
+.tl.ignored .tl-status, .tl.not-logged .tl-status { color: var(--red); }
+
+/* Device status dot */
+.dot {
+  display: inline-block;
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: #bbb;
+  margin-right: 8px;
+}
+.dot.on { background: var(--green); }
 
 /* Text helpers */
 .muted { color: var(--muted); }
