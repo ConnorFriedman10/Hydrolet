@@ -184,6 +184,25 @@ Extend the existing pattern from [app/test/caregiver.test.mjs](../app/test/careg
 5. Add the today's-timeline view to `app/src/pages/Dashboard.tsx`, alongside its existing goal/activity/device cards.
 6. Manual pass in the browser with Connor and Henry, same style as the caregiver walkthrough — including watching the timeline update as fake events are added from the Dev page.
 
+## Later: letting caregivers lock the schedule
+
+Wanted, not built. A caregiver can switch off the cared-for person's own ability to add, edit or delete reminders, so a person with memory loss can't accidentally dismantle the schedule keeping them hydrated.
+
+This is the first thing in the system that makes the two sides **asymmetric**. Everything so far treats an account and its caregivers identically — `has_access()` returns the same answer either way. This feature needs the RPCs to know *which* of the two is calling: `p_main = auth.uid()` means the owner is acting on themselves, anything else is a caregiver.
+
+Sketch:
+
+- `profiles.schedule_locked boolean not null default false`.
+- `upsert_reminder_slot` and `delete_reminder_slot` reject the call when `p_main = auth.uid()` **and** the profile is locked **and** the account has at least one caregiver.
+- Only a caregiver may set the flag — otherwise the owner just unlocks it and the feature does nothing.
+
+Two things to decide before building it:
+
+1. **Lockout.** If the flag stays on after every caregiver is removed, the person can never edit their own schedule again and nobody can unlock it for them. The "at least one caregiver" clause above makes the lock fall away on its own in that case, which is the safer default — worth keeping deliberately rather than by accident.
+2. **What else it should cover.** `daily_goal_ml` is arguably more important to protect than the reminder times, since it's the doctor-set fluid limit — some users are on one for heart or kidney reasons. Locking the times but leaving the goal editable would be an odd half-measure. If more than those two end up locked, swap the boolean for a `restrictions jsonb` rather than growing a column per lock.
+
+And one UI note: the locked state should be **visible and explained** ("Your family looks after your schedule"), not a hidden button or a save that silently fails. Someone with memory loss hitting a control that does nothing is exactly the confusion this product exists to reduce.
+
 ## Deliberately deferred
 
 - **Auto-generated schedule suggestion** — the request explicitly says build the manual editor first; this becomes a later layer that writes the same `reminder_slots` rows a person would, so nothing above needs to change to add it.

@@ -95,6 +95,23 @@ export async function run() {
         codeErr ? '' : 'update silently applied')
     }
 
+    // The app fetches profiles with no filter and lets the select policy do
+    // the scoping, which is what collapses two round trips into one. If that
+    // policy ever widened, this would catch it.
+    {
+      const { data: theirs } = await caregiver.client.from('profiles').select('id')
+      const ids = (theirs ?? []).map((p) => p.id).sort()
+      check('9a. caregiver sees exactly themselves and the account they care for',
+        JSON.stringify(ids) === JSON.stringify([caregiver.id, main.id].sort()),
+        `${ids.length} rows`)
+
+      const { data: mine } = await main.client.from('profiles').select('id')
+      const mineIds = (mine ?? []).map((p) => p.id).sort()
+      check('9b. main sees exactly themselves and their caregiver',
+        JSON.stringify(mineIds) === JSON.stringify([caregiver.id, main.id].sort()),
+        `${mineIds.length} rows`)
+    }
+
     // Removal revokes access.
     {
       const { error } = await main.client.rpc('remove_caregiver', { p_caregiver: caregiver.id })
@@ -107,6 +124,11 @@ export async function run() {
       const { data: mainProfile } = await caregiver.client
         .from('profiles').select('*').eq('id', main.id).maybeSingle()
       check('8c. caregiver loses read access to main', mainProfile === null)
+
+      const { data: visible } = await caregiver.client.from('profiles').select('id')
+      check('8d. unfiltered select narrows back to just themselves',
+        (visible ?? []).length === 1 && visible[0].id === caregiver.id,
+        `${(visible ?? []).length} rows`)
     }
   } finally {
     await caregiver.client.rpc('stop_caring_for', { p_main: main.id })

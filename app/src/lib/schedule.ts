@@ -47,6 +47,11 @@ export function formatTime(timeOfDay: string): string {
 /** "09:00:00" -> "09:00", for an <input type="time">. */
 export const toTimeInput = (timeOfDay: string) => timeOfDay.slice(0, 5)
 
+/** Stand-in until the account's own timezone has loaded. */
+export function browserTimezone(): string {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' } catch { return 'UTC' }
+}
+
 function partsIn(timeZone: string, date: Date) {
   const fmt = new Intl.DateTimeFormat('en-US', {
     timeZone, hourCycle: 'h23',

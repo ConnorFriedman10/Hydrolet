@@ -5,12 +5,14 @@ import type { ReminderSlot } from '../lib/types'
 import {
   DAY_SHORT, EVERY_DAY, WEEKDAYS, WEEKENDS,
   describeMask, hasDay, toggleDay, toMinutes, formatTime, toTimeInput, todayIndex,
+  browserTimezone,
 } from '../lib/schedule'
+import DayTimeline from '../components/DayTimeline'
 
 type Draft = { id: string | null; time: string; days: number; amount: number }
 
 export default function Schedule() {
-  const { subject, reload } = useSubject()
+  const { subject, subjectId, reload } = useSubject()
   const [slots, setSlots] = useState<ReminderSlot[]>([])
   const [day, setDay] = useState(0)
   const [goal, setGoal] = useState(1500)
@@ -18,8 +20,10 @@ export default function Schedule() {
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState(false)
 
-  const mainId = subject?.id
-  const tz = subject?.timezone ?? 'America/New_York'
+  // subjectId is known before the profile loads, so the slots query starts
+  // straight away rather than queueing behind it.
+  const mainId = subjectId
+  const tz = subject?.timezone ?? browserTimezone()
 
   // Default the day tab to the account's today.
   useEffect(() => { setDay(todayIndex(tz)) }, [tz])
@@ -110,6 +114,12 @@ export default function Schedule() {
 
         {forDay.length === 0 && <p className="muted">Nothing scheduled on {DAY_SHORT[day]}.</p>}
 
+        <DayTimeline marks={forDay.map((s) => ({
+          key: s.id,
+          minutes: toMinutes(s.time_of_day),
+          label: formatTime(s.time_of_day),
+        }))} />
+
         <ul className="list">
           {forDay.map((s) => (
             <li key={s.id}>
@@ -130,8 +140,8 @@ export default function Schedule() {
 
         {forDay.length > 0 && (
           <p className="muted small">
-            {DAY_SHORT[day]} totals {dayTotal} mL of a {goal} mL goal
-            {dayTotal !== goal && ' — the rest is whatever she drinks on her own.'}
+            {forDay.length} reminder{forDay.length === 1 ? '' : 's'} on {DAY_SHORT[day]},
+            {' '}{dayTotal} mL in total.
           </p>
         )}
 

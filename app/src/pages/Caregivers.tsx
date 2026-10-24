@@ -1,27 +1,14 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useSubject } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 
-type Caregiver = { id: string; name: string }
-
 export default function Caregivers() {
-  const { me, subjects, reload } = useSubject()
-  const [caregivers, setCaregivers] = useState<Caregiver[]>([])
+  // caregivers comes from the same profiles call the switcher uses, so this
+  // page needs no query of its own.
+  const { me, subjects, caregivers, reload } = useSubject()
   const [code, setCode] = useState('')
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState(false)
-
-  // Accounts that list me in their caretaker_of (the people who care for me).
-  const loadCaregivers = useCallback(async () => {
-    if (!supabase || !me) return
-    const { data } = await supabase
-      .from('profiles')
-      .select('id, name')
-      .contains('caretaker_of', [me.id])
-    setCaregivers((data ?? []) as Caregiver[])
-  }, [me?.id])
-
-  useEffect(() => { loadCaregivers() }, [loadCaregivers])
 
   if (!me) return <p className="muted">Loading…</p>
 
@@ -55,7 +42,7 @@ export default function Caregivers() {
     if (!supabase) return
     const { error } = await supabase.rpc('remove_caregiver', { p_caregiver: id })
     if (error) setMsg(error.message)
-    else await loadCaregivers()
+    else await reload()
   }
 
   const stopCaring = async (id: string) => {

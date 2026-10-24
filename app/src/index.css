@@ -111,6 +111,30 @@ button.link {
 .bar { height: 12px; background: var(--line); border-radius: 6px; overflow: hidden; }
 .bar > div { height: 100%; background: var(--blue); transition: width 0.4s; }
 
+/* Day strip: where the reminders fall across the day.
+   Decorative and non-interactive; the list beneath carries the values.
+   Status is encoded by shape as well as colour, because red and green are not
+   reliably distinguishable for colourblind readers. */
+.daychart { width: 100%; height: auto; display: block; }
+
+.dc-axis { stroke: var(--line); stroke-width: 2; stroke-linecap: round; }
+.dc-tick { stroke: var(--line); stroke-width: 1; }
+.dc-stem { stroke: var(--line); stroke-width: 2; }
+
+/* Text wears text tokens, never the status colour; the mark carries identity. */
+.dc-label { fill: var(--muted); font-size: 19px; font-variant-numeric: tabular-nums; }
+
+/* The 2px ring in the surface colour keeps a dot legible over the line. */
+.dc-dot { fill: var(--blue); stroke: var(--card); stroke-width: 2; }
+.dc-dot.hollow { fill: var(--card); stroke-width: 2.5; }
+.dc-halo { fill: none; stroke: var(--blue); stroke-width: 2; }
+
+.dc-mark.completed .dc-dot { fill: var(--green); }
+.dc-mark.ignored .dc-dot { fill: var(--red); }
+.dc-mark.not-logged .dc-dot { stroke: var(--red); }
+.dc-mark.upcoming .dc-dot { stroke: var(--muted); }
+.dc-mark.upcoming { opacity: 0.75; }
+
 /* Today's timeline */
 .timeline { list-style: none; margin: 0; padding: 0; }
 .tl {

@@ -2,63 +2,93 @@ import { useCallback, useEffect, useState } from 'react'
 import { useSubject } from '../lib/auth'
 import { supabase } from '../lib/supabase'
 import type { Device, HydroEvent, ReminderSlot } from '../lib/types'
-import { startOfToday } from '../lib/schedule'
-import { buildTimeline, STATUS_TEXT } from '../lib/timeline'
+import { browserTimezone, startOfToday } from '../lib/schedule'
+import { buildTimeline, scheduledTotal, STATUS_TEXT } from '../lib/timeline'
+import DayTimeline from '../components/DayTimeline'
 
 const ONLINE_WINDOW_MS = 30_000
 
+// Events are fetched by a plain clock window rather than "since midnight", so
+// the query does not have to wait for the account's timezone to load. Three
+// days covers any timezone's idea of today; the rendering below narrows it.
+const WINDOW_MS = 72 * 60 * 60 * 1000
+
 export default function Dashboard() {
-  const { subject } = useSubject()
+  const { subject, subjectId } = useSubject()
   const [events, setEvents] = useState<HydroEvent[]>([])
   const [slots, setSlots] = useState<ReminderSlot[]>([])
   const [devices, setDevices] = useState<Device[]>([])
   const [msg, setMsg] = useState('')
   const [, setTick] = useState(0)
 
-  const mainId = subject?.id
-  const tz = subject?.timezone ?? 'America/New_York'
+  // Falls back to this browser's zone for the moment before the profile
+  // arrives; the real one then re-filters what has already been fetched.
+  const tz = subject?.timezone ?? browserTimezone()
 
-  const loadAll = useCallback(async () => {
-    if (!supabase || !mainId) return
-    const since = startOfToday(tz).toISOString()
-    const [ev, sl, dv] = await Promise.all([
-      supabase.from('events').select('*').eq('main_id', mainId)
-        .gte('created_at', since).order('created_at', { ascending: false }),
-      supabase.from('reminder_slots').select('*').eq('main_id', mainId),
-      supabase.from('devices').select('*').eq('owner_id', mainId),
-    ])
-    setEvents((ev.data ?? []) as HydroEvent[])
-    setSlots((sl.data ?? []) as ReminderSlot[])
-    setDevices((dv.data ?? []) as Device[])
-  }, [mainId, tz])
+  const loadEvents = useCallback(async () => {
+    if (!supabase || !subjectId) return
+    const since = new Date(Date.now() - WINDOW_MS).toISOString()
+    const { data } = await supabase.from('events').select('*')
+      .eq('main_id', subjectId).gte('created_at', since)
+      .order('created_at', { ascending: false }).limit(500)
+    setEvents((data ?? []) as HydroEvent[])
+  }, [subjectId])
+
+  const loadSlots = useCallback(async () => {
+    if (!supabase || !subjectId) return
+    const { data } = await supabase.from('reminder_slots').select('*').eq('main_id', subjectId)
+    setSlots((data ?? []) as ReminderSlot[])
+  }, [subjectId])
+
+  const loadDevices = useCallback(async () => {
+    if (!supabase || !subjectId) return
+    const { data } = await supabase.from('devices').select('*').eq('owner_id', subjectId)
+    setDevices((data ?? []) as Device[])
+  }, [subjectId])
 
   useEffect(() => {
-    loadAll()
-    if (!supabase || !mainId) return
-    const channel = supabase.channel(`dash-${mainId}`)
+    if (!supabase || !subjectId) return
+    loadEvents(); loadSlots(); loadDevices()
+
+    // Apply what changed instead of refetching all three tables. During
+    // time-lapse this is the difference between one message and a burst of
+    // queries per event.
+    const scope = { schema: 'public', filter: `main_id=eq.${subjectId}` } as const
+    const channel = supabase.channel(`dash-${subjectId}`)
+      .on('postgres_changes', { event: 'INSERT', table: 'events', ...scope },
+        (p) => setEvents((prev) => [p.new as HydroEvent, ...prev]))
+      .on('postgres_changes', { event: 'UPDATE', table: 'events', ...scope },
+        (p) => setEvents((prev) => prev.map((e) =>
+          e.id === (p.new as HydroEvent).id ? (p.new as HydroEvent) : e)))
+      .on('postgres_changes', { event: 'DELETE', table: 'events', ...scope },
+        (p) => setEvents((prev) => prev.filter((e) => e.id !== (p.old as HydroEvent).id)))
+      .on('postgres_changes', { event: '*', table: 'reminder_slots', ...scope },
+        () => loadSlots())
       .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'events', filter: `main_id=eq.${mainId}` },
-        () => loadAll())
-      .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'devices', filter: `owner_id=eq.${mainId}` },
-        () => loadAll())
-      .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'reminder_slots', filter: `main_id=eq.${mainId}` },
-        () => loadAll())
+        { event: '*', schema: 'public', table: 'devices', filter: `owner_id=eq.${subjectId}` },
+        () => loadDevices())
       .subscribe()
-    // Re-render each minute so "Upcoming" flips over and "last seen" stays honest.
+
+    // Re-render each half minute so "Upcoming" flips over in time.
     const timer = setInterval(() => setTick((n) => n + 1), 30_000)
     return () => { supabase?.removeChannel(channel); clearInterval(timer) }
-  }, [mainId, loadAll])
+  }, [subjectId, loadEvents, loadSlots, loadDevices])
 
   if (!subject) return <p className="muted">Loading…</p>
 
-  const total = events
+  const dayStart = startOfToday(tz).getTime()
+  const today = events.filter((e) => new Date(e.created_at).getTime() >= dayStart)
+
+  const timeline = buildTimeline(today, slots, tz)
+
+  const total = today
     .filter((e) => e.type === 'sip')
     .reduce((sum, e) => sum + (e.amount_ml ?? 0), 0)
-  const pct = Math.min(100, Math.round((total / subject.daily_goal_ml) * 100))
 
-  const timeline = buildTimeline(events, slots, tz)
+  // The target comes from the schedule itself — the amounts on today's
+  // reminders, added up. Nobody sets it by hand.
+  const target = scheduledTotal(timeline)
+  const pct = target > 0 ? Math.min(100, Math.round((total / target) * 100)) : 0
 
   const command = async (cmd: string, okMsg: string) => {
     if (!supabase) return
@@ -70,7 +100,7 @@ export default function Dashboard() {
     <>
       <section className="card">
         <h2>{subject.name || 'Today'}</h2>
-        <div className="big">{total} <span className="muted">/ {subject.daily_goal_ml} mL</span></div>
+        <div className="big">{total} <span className="muted">/ {target} mL</span></div>
         <div className="bar"><div style={{ width: `${pct}%` }} /></div>
         <p className="muted small">Water drunk during reminders.</p>
       </section>
@@ -82,6 +112,9 @@ export default function Dashboard() {
             No reminders scheduled today. Add some on the Schedule page.
           </p>
         )}
+        <DayTimeline marks={timeline.map((e) => ({
+          key: e.key, minutes: e.minutes, label: e.label, status: e.status,
+        }))} />
         <ul className="timeline">
           {timeline.map((e) => (
             <li key={e.key} className={`tl ${e.status}`}>
@@ -91,9 +124,7 @@ export default function Dashboard() {
                 {!e.scheduled && <span className="muted small"> · unscheduled</span>}
                 <br />
                 <span className="muted small">
-                  {e.target === null
-                    ? `${e.drank} mL`
-                    : `${e.drank} of ${e.target} mL`}
+                  {e.target === null ? `${e.drank} mL` : `${e.drank} of ${e.target} mL`}
                 </span>
               </span>
             </li>

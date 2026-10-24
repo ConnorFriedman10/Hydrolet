@@ -4,7 +4,7 @@
 // Node runs the TypeScript source directly via --experimental-strip-types
 // (see the npm scripts).
 
-import { buildTimeline } from '../src/lib/timeline.ts'
+import { buildTimeline, scheduledTotal } from '../src/lib/timeline.ts'
 import { createSuite, runIfMain } from './helpers.mjs'
 
 const TZ = 'America/New_York'
@@ -129,6 +129,32 @@ export async function run() {
     check('sorted by time of day',
       JSON.stringify(order) === JSON.stringify(['8:00 AM', '11:00 AM', '12:30 PM', '8:00 PM']),
       order.join(' / '))
+  }
+
+  // The day's target: what the scheduled reminders add up to.
+  {
+    const slots = [slot('09:00', 150), slot('13:00', 200), slot('18:00', 250)]
+    check('sums today\'s reminders', scheduledTotal(buildTimeline([], slots, TZ, NOW)) === 600)
+  }
+  {
+    const thursday = 1 << 4
+    const slots = [slot('09:00', 150), slot('10:00', 999, thursday)]
+    check('ignores reminders that are not on today',
+      scheduledTotal(buildTimeline([], slots, TZ, NOW)) === 150)
+  }
+  {
+    // An on-demand "remind her now" has no planned amount, so it must not
+    // raise the target, even though its sips count towards it.
+    const ev = [
+      event('reminder', { at: '14:30', reminderId: 'r9' }),
+      event('sip', { at: '14:31', reminderId: 'r9', ml: 300 }),
+    ]
+    const entries = buildTimeline(ev, [slot('09:00', 150)], TZ, NOW)
+    check('an unscheduled reminder does not raise the target',
+      scheduledTotal(entries) === 150, String(scheduledTotal(entries)))
+  }
+  {
+    check('no reminders means no target', scheduledTotal(buildTimeline([], [], TZ, NOW)) === 0)
   }
 
   return results()

@@ -29,6 +29,19 @@ export const STATUS_TEXT: Record<Status, string> = {
 }
 
 /**
+ * What today's reminders add up to: the day's actual target.
+ *
+ * Only scheduled reminders count. An on-demand "remind her now" has no planned
+ * amount, so it cannot raise the target — though whatever she drinks during one
+ * still counts towards it.
+ */
+export function scheduledTotal(entries: Entry[]): number {
+  return entries
+    .filter((e) => e.scheduled && e.target !== null)
+    .reduce((sum, e) => sum + (e.target ?? 0), 0)
+}
+
+/**
  * A scheduled slot is matched to what happened through the 'reminder' event
  * carrying its reminder_slot_id. The sips and the closing completed/ignored
  * row share that firing's reminder_id, so they are found through it.
