@@ -109,6 +109,11 @@ export async function run() {
       p.url === `/?main=${U1}` && p.body.startsWith('400 mL of 1.5 L'), `${p.url} ${p.body}`)
   }
   check('20. test payload', testPayload().tag === 'test' && testPayload().url === '/')
+  {
+    const p = behindPayload(summary({ total_ml: 400 }), '  ')
+    check('21. behind alert without a name uses no pronoun',
+      p.title === 'Behind on water today' && !/\b(she|her|he|his)\b/i.test(p.title + p.body), p.title)
+  }
 
   return results()
 }

@@ -167,6 +167,11 @@ button.link {
 .sips { list-style: none; margin: 4px 0 0; padding: 0; color: var(--muted); }
 .sips li { margin: 0; }
 
+/* Daily report */
+.report-headline { margin: 0; font-weight: 600; }
+.report-points { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.report-firings summary { cursor: pointer; color: var(--blue); font-weight: 500; padding: 4px 0; }
+
 /* Device status dot */
 .dot {
   display: inline-block;

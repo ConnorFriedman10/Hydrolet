@@ -89,6 +89,7 @@ String wifiSsid, wifiPass;
 bool wifiFromFlash = false;
 unsigned long nextAttempt = 0;
 uint8_t lastReason = 0;
+volatile bool ownDisconnect = false;   // set while we abort an attempt ourselves
 
 constexpr uint8_t MAX_SCAN = 20;
 String scanned[MAX_SCAN];
@@ -158,8 +159,17 @@ void begin() {
   WiFi.setSortMethod(WIFI_CONNECT_AP_BY_SIGNAL);
 
   WiFi.onEvent([](arduino_event_id_t, arduino_event_info_t info) {
-    lastReason = info.wifi_sta_disconnected.reason;
+    const uint8_t r = info.wifi_sta_disconnected.reason;
+    // 8 is our own disconnect() before a retry. Recording it would hide the
+    // reason the previous attempt really failed.
+    if (r == 8 && ownDisconnect) return;
+    lastReason = r;
+    Serial.printf("[API] wifi disconnected: reason %u, %s\n", r, reasonText(r));
   }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+
+  WiFi.onEvent([](arduino_event_id_t, arduino_event_info_t) {
+    Serial.println(F("[API] wifi associated, waiting for login/IP"));
+  }, ARDUINO_EVENT_WIFI_STA_CONNECTED);
 
   Serial.printf("[API] mac %s\n", WiFi.macAddress().c_str());
   scanNetworks();
@@ -189,14 +199,18 @@ bool ensureWifi() {
   }
 
   if (millis() >= nextAttempt) {
-    nextAttempt = millis() + 15000;
+    // Enterprise logins go through the university's login server and can take
+    // several seconds, so give each attempt longer before cutting it off.
+    nextAttempt = millis() + 25000;
     if (lastReason) {
       Serial.printf("[API] last attempt failed: reason %u, %s\n", lastReason, reasonText(lastReason));
       lastReason = 0;
     }
     // Abandon whatever attempt is still pending, so this one is not refused.
+    ownDisconnect = true;
     WiFi.disconnect(false, false);
-    delay(50);
+    delay(100);
+    ownDisconnect = false;
 
 #ifdef WIFI_EAP_USERNAME
     // Enterprise login (NUwave, eduroam): a username and password checked by

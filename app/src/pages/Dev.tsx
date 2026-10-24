@@ -75,7 +75,7 @@ export default function Dev() {
         <h2>Fire a reminder</h2>
         <p className="muted small">
           Stands in for the coaster deciding it's time. Pick one of today's scheduled
-          reminders, or fire an unscheduled one like "remind her now" does.
+          reminders, or fire an unscheduled one like "Send a reminder now" does.
         </p>
         {todaysSlots.length === 0 && (
           <p className="muted">Nothing scheduled today — add some on the Schedule page.</p>

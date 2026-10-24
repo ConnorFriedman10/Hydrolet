@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "test": "node --experimental-strip-types --no-warnings test/run-all.mjs",
     "test:timeline": "node --experimental-strip-types --no-warnings test/timeline.test.mjs",
+    "test:report": "node --experimental-strip-types --no-warnings test/report.test.mjs",
     "test:device-api": "node --experimental-strip-types --no-warnings test/device-api.test.mjs",
     "test:send-push": "node --experimental-strip-types --no-warnings test/send-push.test.mjs",
     "test:caregiver": "node test/caregiver.test.mjs",

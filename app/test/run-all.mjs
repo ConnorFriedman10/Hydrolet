@@ -7,11 +7,12 @@ import { run as caregiver } from './caregiver.test.mjs'
 import { run as schedule } from './schedule.test.mjs'
 import { run as events } from './events.test.mjs'
 import { run as deviceApi } from './device-api.test.mjs'
+import { run as report } from './report.test.mjs'
 import { run as sendPush } from './send-push.test.mjs'
 
 // Pure logic first: it is fast and needs no network, so a failure there shows
 // up before the slower database suites run.
-const suites = [timeline, daychart, deviceApi, sendPush, caregiver, schedule, events]
+const suites = [timeline, daychart, deviceApi, sendPush, caregiver, schedule, events, report]
 
 let passed = 0
 const failures = []

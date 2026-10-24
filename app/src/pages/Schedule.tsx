@@ -92,7 +92,7 @@ export default function Schedule() {
       <section className="card">
         <h2>Daily goal</h2>
         <p className="muted small">
-          Confirm this with her doctor. Some people are on a fluid limit.
+          Confirm this with a doctor. Some people are on a fluid limit.
         </p>
         <label>Goal (mL)
           <input type="number" min={100} max={6000} step={50} value={goal}

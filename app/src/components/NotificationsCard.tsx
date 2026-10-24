@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { disablePush, enablePush, getPushState, sendPush, type PushState } from '../lib/push'
 
 // "Enable notifications" for this device: the daily summary, and an alert
-// only when she falls well behind.
+// only when drinking falls well behind.
 export default function NotificationsCard() {
   const [state, setState] = useState<PushState | null>(null)
   const [busy, setBusy] = useState(false)
@@ -46,7 +46,7 @@ export default function NotificationsCard() {
     <section className="card">
       <h2>Notifications</h2>
       <p className="muted small">
-        A summary each evening, and an alert only if she falls well behind.
+        A summary each evening, and an alert only if drinking falls well behind.
       </p>
 
       {state === null && <p className="muted small">Checking…</p>}

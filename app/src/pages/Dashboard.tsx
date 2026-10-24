@@ -159,7 +159,7 @@ export default function Dashboard() {
       <section className="card">
         <h2>Actions</h2>
         <button onClick={() => command('remindNow', 'Reminder sent. It may take a few seconds.')}>
-          Remind her now
+          Send a reminder now
         </button>
         <div className="row">
           <button className="secondary" onClick={() => command('timelapse_on', 'Time-lapse on.')}>

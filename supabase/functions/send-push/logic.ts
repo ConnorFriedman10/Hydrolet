@@ -131,9 +131,10 @@ export function summaryPayload(s: SummaryRow, name: string): PushPayload {
 }
 
 export function behindPayload(s: SummaryRow, name: string): PushPayload {
-  const who = name.trim() || 'She'
+  // No pronoun fallback: without a name, the title stands on its own.
+  const who = name.trim()
   return {
-    title: `${who} is behind today`,
+    title: who ? `${who} is behind today` : 'Behind on water today',
     body: `${formatVolume(s.total_ml)} of ${formatVolume(s.goal_ml)} goal so far, drunk during reminders.`,
     url: `/?main=${s.main_id}`,
     tag: `behind-${s.main_id}`,

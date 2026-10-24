@@ -14,7 +14,7 @@ async function logOut() {
 const tabs = [
   { to: '/', label: 'Today', end: true },
   { to: '/schedule', label: 'Schedule' },
-  { to: '/summary', label: 'Summary' },
+  { to: '/summary', label: 'Report' },
   { to: '/caregivers', label: 'Family' },
 ]
 
@@ -22,8 +22,8 @@ export default function Layout() {
   const { subjects, subject, me, select } = useSubject()
   const [params, setParams] = useSearchParams()
 
-  // Notifications link to ?main=<account id>, so tapping one about Grandma
-  // switches to Grandma even if another account was selected.
+  // Notifications link to ?main=<account id>, so tapping one about a person
+  // switches to that person's account even if another one was selected.
   const linked = params.get('main')
   useEffect(() => {
     if (!linked || !subjects.some((p) => p.id === linked)) return

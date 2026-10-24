@@ -1,5 +1,5 @@
 // Builds the Dashboard's "today" timeline: every reminder scheduled for today,
-// plus any firing that didn't come from the schedule (a "remind her now").
+// plus any firing that didn't come from the schedule (a "Send a reminder now").
 //
 // Pure logic, kept out of the component so it can be unit-tested.
 
@@ -33,9 +33,9 @@ export const STATUS_TEXT: Record<Status, string> = {
 /**
  * What today's reminders add up to: the day's actual target.
  *
- * Only scheduled reminders count. An on-demand "remind her now" has no planned
- * amount, so it cannot raise the target — though whatever she drinks during one
- * still counts towards it.
+ * Only scheduled reminders count. An on-demand "Send a reminder now" has no
+ * planned amount, so it cannot raise the target — though whatever is drunk
+ * during one still counts towards it.
  */
 export function scheduledTotal(entries: Entry[]): number {
   return entries
@@ -95,7 +95,7 @@ export function buildTimeline(
     })
   }
 
-  // Firings with no slot behind them: a "remind her now", or a slot deleted since.
+  // Firings with no slot behind them: a "Send a reminder now", or a slot deleted since.
   for (const firing of fired) {
     if (firing.reminder_slot_id && slots.some((s) => s.id === firing.reminder_slot_id)) continue
     const closer = closedBy(firing.reminder_id)

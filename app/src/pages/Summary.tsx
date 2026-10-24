@@ -6,20 +6,26 @@ import type { HydroEvent, ReminderSlot, Summary as SummaryRow } from '../lib/typ
 import { addDays, browserTimezone, eventTime, formatDate, localDate, startOfDate } from '../lib/schedule'
 import { buildDay, STATUS_TEXT } from '../lib/timeline'
 import { sendPush } from '../lib/push'
+import { clock, describe, headline, OUTCOME_TEXT, volume, type DailyReport } from '../lib/report'
 import DayTimeline from '../components/DayTimeline'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const HISTORY_DAYS = 14
 
-// One day: the total against the goal, then each reminder with when she drank
-// and how much. ?date=YYYY-MM-DD picks the day (the summary notification links
-// here); no date means today, in the account's own timezone.
+// One day: the total against the goal, the daily report on drinking patterns,
+// then each reminder with when water was drunk and how much. ?date=YYYY-MM-DD
+// picks the day (the summary notification links here); no date means today, in
+// the account's own timezone. The person and their caregivers all see the same
+// page for the same account.
 export default function Summary() {
   const { subject, subjectId } = useSubject()
   const [params, setParams] = useSearchParams()
   const [events, setEvents] = useState<HydroEvent[]>([])
   const [slots, setSlots] = useState<ReminderSlot[]>([])
   const [history, setHistory] = useState<SummaryRow[]>([])
+  const [report, setReport] = useState<DailyReport | null>(null)
+  const [reportMsg, setReportMsg] = useState('')
+  const [reportBusy, setReportBusy] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [msg, setMsg] = useState('')
   const [busy, setBusy] = useState(false)
@@ -53,8 +59,37 @@ export default function Summary() {
     setHistory((data ?? []) as SummaryRow[])
   }, [subjectId])
 
+  const loadReport = useCallback(async () => {
+    if (!supabase || !subjectId) return
+    const { data } = await supabase.from('daily_reports').select('*')
+      .eq('main_id', subjectId).eq('date', date).maybeSingle()
+    setReport((data ?? null) as DailyReport | null)
+  }, [subjectId, date])
+
   useEffect(() => { setLoaded(false); loadDay() }, [loadDay])
   useEffect(() => { loadHistory() }, [loadHistory])
+  useEffect(() => { setReport(null); setReportMsg(''); loadReport() }, [loadReport])
+
+  // The nightly job writes reports; show one as soon as it lands, whichever
+  // account (the person or a caregiver) is looking.
+  useEffect(() => {
+    if (!supabase || !subjectId) return
+    const channel = supabase.channel(`report-${subjectId}`)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'daily_reports', filter: `main_id=eq.${subjectId}` },
+        () => loadReport())
+      .subscribe()
+    return () => { supabase?.removeChannel(channel) }
+  }, [subjectId, loadReport])
+
+  const createReport = async () => {
+    if (!supabase || !subjectId) return
+    setReportBusy(true); setReportMsg('')
+    const { data, error } = await supabase.rpc('refresh_daily_report', { p_main: subjectId, p_date: date })
+    if (error) setReportMsg(error.message)
+    else setReport(data as DailyReport)
+    setReportBusy(false)
+  }
 
   // Today stays live, so a time-lapse run fills in as it happens.
   useEffect(() => {
@@ -123,6 +158,57 @@ export default function Summary() {
             : `${day.sent} reminder${day.sent === 1 ? '' : 's'} went off, ${day.ignored} ignored.`}
           {day.planned > 0 && ` ${day.planned} mL was planned across the scheduled reminders.`}
         </p>
+      </section>
+
+      <section className="card" aria-labelledby="report-title">
+        <h2 id="report-title">Daily report</h2>
+        {!report && (
+          <p className="muted small">
+            {isToday
+              ? "Today's report is created automatically at 8 PM, and updated just after midnight."
+              : 'No report was created for this day.'}
+          </p>
+        )}
+        {report && (
+          <>
+            <p className="report-headline">{headline(report.report)}</p>
+            {describe(report.report).length > 0 && (
+              <ul className="report-points">
+                {describe(report.report).map((line) => <li key={line}>{line}</li>)}
+              </ul>
+            )}
+            {report.report.firings.length > 0 && (
+              <details className="report-firings">
+                <summary>Each reminder</summary>
+                <ul className="list">
+                  {report.report.firings.map((f, i) => (
+                    <li key={`${f.time}-${i}`}>
+                      <span>
+                        {clock(f.time)}
+                        {!f.scheduled && <span className="muted small"> · from the app</span>}
+                      </span>
+                      <span className="muted small">
+                        {OUTCOME_TEXT[f.outcome]} · {f.target_ml === null
+                          ? volume(f.drank_ml)
+                          : `${volume(f.drank_ml)} of ${volume(f.target_ml)}`}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+            <p className="muted small">
+              {report.report.day_complete ? 'Final report' : 'Report so far'}, created{' '}
+              {new Date(report.generated_at).toLocaleString([], {
+                weekday: 'short', hour: 'numeric', minute: '2-digit',
+              })}. Describes patterns only; not medical advice.
+            </p>
+          </>
+        )}
+        <button className="secondary" onClick={createReport} disabled={reportBusy}>
+          {report ? 'Update report' : isToday ? "Create today's report now" : 'Create report for this day'}
+        </button>
+        {reportMsg && <p className="error small" role="alert">{reportMsg}</p>}
       </section>
 
       <section className="card">
